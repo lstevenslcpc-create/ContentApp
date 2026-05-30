@@ -1,0 +1,94 @@
+import { NextResponse } from "next/server";
+import { authErrorResponse, requireApiUser } from "@/lib/auth";
+import { generateContentOpportunities } from "@/lib/openai";
+import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import type { ContentOpportunity } from "@/lib/types";
+
+function toOpportunityRow(opportunity: ContentOpportunity, userId: string) {
+  return {
+    user_id: userId,
+    topic: opportunity.topic,
+    audience: opportunity.audience,
+    content_pillar: opportunity.content_pillar,
+    platform_recommendations: opportunity.platform_recommendations || {},
+    seo_keywords: opportunity.seo_keywords || [],
+    emotional_angle: opportunity.emotional_angle,
+    product_tie_in: opportunity.product_tie_in || null,
+    service_tie_in: opportunity.service_tie_in || null,
+    cta: opportunity.cta,
+    clinical_sensitivity: opportunity.clinical_sensitivity || "medium",
+    status: opportunity.status || "idea"
+  };
+}
+
+export async function GET(request: Request) {
+  try {
+    const user = await requireApiUser(request);
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from("content_opportunities")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(24);
+
+    if (error) throw error;
+    return NextResponse.json({ opportunities: data || [] });
+  } catch (error) {
+    const authResponse = authErrorResponse(error);
+    if (authResponse) return authResponse;
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to load content opportunities." }, { status: 500 });
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const user = await requireApiUser(request);
+    const body = await request.json();
+    const action = body.action || "generate";
+    const supabase = getSupabaseAdmin();
+
+    if (action === "generate") {
+      const theme = String(body.theme || "").trim();
+      if (!theme) {
+        return NextResponse.json({ error: "Enter a theme to generate content opportunities." }, { status: 400 });
+      }
+
+      const { data: brandBrain, error: brandBrainError } = await supabase
+        .from("brand_brains")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (brandBrainError) throw brandBrainError;
+
+      const opportunities = await generateContentOpportunities(theme, brandBrain);
+      return NextResponse.json({
+        opportunities,
+        disclaimer: "AI-assisted content strategy suggestions. Live search and social trend APIs are not connected yet."
+      });
+    }
+
+    if (action === "save") {
+      const opportunity = body.opportunity as ContentOpportunity | undefined;
+      if (!opportunity?.topic) {
+        return NextResponse.json({ error: "A content opportunity is required." }, { status: 400 });
+      }
+
+      const { data, error } = await supabase
+        .from("content_opportunities")
+        .insert(toOpportunityRow(opportunity, user.id))
+        .select("*")
+        .single();
+
+      if (error) throw error;
+      return NextResponse.json({ opportunity: data });
+    }
+
+    return NextResponse.json({ error: "Unsupported content intelligence action." }, { status: 400 });
+  } catch (error) {
+    const authResponse = authErrorResponse(error);
+    if (authResponse) return authResponse;
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to process content intelligence request." }, { status: 500 });
+  }
+}

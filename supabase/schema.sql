@@ -1,0 +1,307 @@
+create extension if not exists pgcrypto;
+
+create table if not exists business_profiles (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade,
+  business_name text not null,
+  industry text,
+  services_offered text,
+  target_audience text,
+  location_served text,
+  brand_voice text,
+  main_goal text,
+  website_link text,
+  social_handles jsonb default '{}'::jsonb,
+  offer_promotion text,
+  call_to_action text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create table if not exists brand_brains (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  brand_name text not null,
+  tagline text,
+  mission text,
+  personality_sliders jsonb default '{}'::jsonb,
+  voice_tone jsonb default '{}'::jsonb,
+  forbidden_ai_phrases text[] default '{}',
+  audience_profiles jsonb default '[]'::jsonb,
+  therapy_services jsonb default '[]'::jsonb,
+  product_catalog jsonb default '[]'::jsonb,
+  visual_identity jsonb default '{}'::jsonb,
+  clinical_safety_rules jsonb default '{}'::jsonb,
+  ai_instruction_layer jsonb default '{}'::jsonb,
+  seo_priorities text[] default '{}',
+  preferred_cta_styles text[] default '{}',
+  preferred_platforms text[] default '{}',
+  content_goals text[] default '{}',
+  conversion_priorities text[] default '{}',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create unique index if not exists brand_brains_user_id_idx
+on brand_brains(user_id);
+
+create table if not exists generated_content (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade,
+  business_profile_id uuid references business_profiles(id) on delete set null,
+  platform text,
+  content_type text,
+  content_goal text,
+  hook text,
+  caption text,
+  hashtags text[] default '{}',
+  visual_idea text,
+  script text,
+  status text default 'needs_review',
+  scheduled_for timestamptz,
+  posted_at timestamptz,
+  media_url text,
+  media_provider text,
+  media_job_id text,
+  media_status text,
+  canva_design_url text,
+  canva_template_id text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  constraint generated_content_status_check check (status in ('draft', 'needs_review', 'approved', 'scheduled', 'posted', 'failed')),
+  constraint generated_content_media_status_check check (media_status is null or media_status in ('not_started', 'processing', 'completed', 'failed'))
+);
+
+create table if not exists content_opportunities (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  topic text not null,
+  audience text,
+  content_pillar text,
+  platform_recommendations jsonb default '{}'::jsonb,
+  seo_keywords text[] default '{}',
+  emotional_angle text,
+  product_tie_in text,
+  service_tie_in text,
+  cta text,
+  clinical_sensitivity text,
+  status text default 'idea',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  constraint content_opportunities_clinical_sensitivity_check check (clinical_sensitivity is null or clinical_sensitivity in ('low', 'medium', 'high')),
+  constraint content_opportunities_status_check check (status in ('idea', 'draft', 'generated', 'archived'))
+);
+
+create table if not exists media_library (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade,
+  title text,
+  description text,
+  asset_type text not null,
+  source text,
+  platform text,
+  content_pillar text,
+  product_tie_in text,
+  service_tie_in text,
+  campaign_id uuid,
+  linked_content_id uuid references generated_content(id) on delete set null,
+  media_url text,
+  thumbnail_url text,
+  text_content text,
+  prompt text,
+  tags text[] default '{}',
+  status text default 'saved',
+  metadata jsonb default '{}'::jsonb,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  constraint media_library_status_check check (status in ('draft', 'saved', 'approved', 'used', 'archived'))
+);
+
+create table if not exists social_accounts (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade,
+  platform text not null,
+  account_name text,
+  status text default 'not_connected',
+  access_token_encrypted text,
+  created_at timestamptz default now()
+);
+
+create table if not exists integration_connections (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  provider text not null,
+  account_name text,
+  status text default 'prepared',
+  access_token_encrypted text,
+  refresh_token_encrypted text,
+  expires_at timestamptz,
+  metadata jsonb default '{}'::jsonb,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  constraint integration_connections_provider_check check (provider in ('canva', 'instagram', 'facebook', 'tiktok', 'linkedin', 'youtube')),
+  constraint integration_connections_status_check check (status in ('not_connected', 'prepared', 'connected', 'expired', 'revoked'))
+);
+
+create unique index if not exists integration_connections_user_provider_idx
+on integration_connections(user_id, provider);
+
+create table if not exists analytics_events (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade,
+  content_id uuid references generated_content(id) on delete set null,
+  platform text,
+  event_type text not null,
+  metadata jsonb default '{}'::jsonb,
+  created_at timestamptz default now()
+);
+
+alter table business_profiles add column if not exists user_id uuid references auth.users(id) on delete cascade;
+alter table brand_brains add column if not exists user_id uuid references auth.users(id) on delete cascade;
+alter table brand_brains add column if not exists brand_name text;
+alter table brand_brains add column if not exists tagline text;
+alter table brand_brains add column if not exists mission text;
+alter table brand_brains add column if not exists personality_sliders jsonb default '{}'::jsonb;
+alter table brand_brains add column if not exists voice_tone jsonb default '{}'::jsonb;
+alter table brand_brains add column if not exists forbidden_ai_phrases text[] default '{}';
+alter table brand_brains add column if not exists audience_profiles jsonb default '[]'::jsonb;
+alter table brand_brains add column if not exists therapy_services jsonb default '[]'::jsonb;
+alter table brand_brains add column if not exists product_catalog jsonb default '[]'::jsonb;
+alter table brand_brains add column if not exists visual_identity jsonb default '{}'::jsonb;
+alter table brand_brains add column if not exists clinical_safety_rules jsonb default '{}'::jsonb;
+alter table brand_brains add column if not exists ai_instruction_layer jsonb default '{}'::jsonb;
+alter table brand_brains add column if not exists seo_priorities text[] default '{}';
+alter table brand_brains add column if not exists preferred_cta_styles text[] default '{}';
+alter table brand_brains add column if not exists preferred_platforms text[] default '{}';
+alter table brand_brains add column if not exists content_goals text[] default '{}';
+alter table brand_brains add column if not exists conversion_priorities text[] default '{}';
+alter table generated_content add column if not exists user_id uuid references auth.users(id) on delete cascade;
+alter table generated_content add column if not exists canva_design_url text;
+alter table generated_content add column if not exists canva_template_id text;
+alter table content_opportunities add column if not exists user_id uuid references auth.users(id) on delete cascade;
+alter table content_opportunities add column if not exists topic text;
+alter table content_opportunities add column if not exists audience text;
+alter table content_opportunities add column if not exists content_pillar text;
+alter table content_opportunities add column if not exists platform_recommendations jsonb default '{}'::jsonb;
+alter table content_opportunities add column if not exists seo_keywords text[] default '{}';
+alter table content_opportunities add column if not exists emotional_angle text;
+alter table content_opportunities add column if not exists product_tie_in text;
+alter table content_opportunities add column if not exists service_tie_in text;
+alter table content_opportunities add column if not exists cta text;
+alter table content_opportunities add column if not exists clinical_sensitivity text;
+alter table content_opportunities add column if not exists status text default 'idea';
+alter table media_library add column if not exists user_id uuid references auth.users(id) on delete cascade;
+alter table media_library add column if not exists title text;
+alter table media_library add column if not exists description text;
+alter table media_library add column if not exists asset_type text;
+alter table media_library add column if not exists source text;
+alter table media_library add column if not exists platform text;
+alter table media_library add column if not exists content_pillar text;
+alter table media_library add column if not exists product_tie_in text;
+alter table media_library add column if not exists service_tie_in text;
+alter table media_library add column if not exists campaign_id uuid;
+alter table media_library add column if not exists linked_content_id uuid references generated_content(id) on delete set null;
+alter table media_library add column if not exists media_url text;
+alter table media_library add column if not exists thumbnail_url text;
+alter table media_library add column if not exists text_content text;
+alter table media_library add column if not exists prompt text;
+alter table media_library add column if not exists tags text[] default '{}';
+alter table media_library add column if not exists status text default 'saved';
+alter table media_library add column if not exists metadata jsonb default '{}'::jsonb;
+alter table social_accounts add column if not exists user_id uuid references auth.users(id) on delete cascade;
+alter table analytics_events add column if not exists user_id uuid references auth.users(id) on delete cascade;
+
+create or replace function set_updated_at()
+returns trigger as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists business_profiles_updated_at on business_profiles;
+create trigger business_profiles_updated_at
+before update on business_profiles
+for each row execute procedure set_updated_at();
+
+drop trigger if exists brand_brains_updated_at on brand_brains;
+create trigger brand_brains_updated_at
+before update on brand_brains
+for each row execute procedure set_updated_at();
+
+drop trigger if exists generated_content_updated_at on generated_content;
+create trigger generated_content_updated_at
+before update on generated_content
+for each row execute procedure set_updated_at();
+
+drop trigger if exists content_opportunities_updated_at on content_opportunities;
+create trigger content_opportunities_updated_at
+before update on content_opportunities
+for each row execute procedure set_updated_at();
+
+drop trigger if exists media_library_updated_at on media_library;
+create trigger media_library_updated_at
+before update on media_library
+for each row execute procedure set_updated_at();
+
+drop trigger if exists integration_connections_updated_at on integration_connections;
+create trigger integration_connections_updated_at
+before update on integration_connections
+for each row execute procedure set_updated_at();
+
+alter table business_profiles enable row level security;
+alter table brand_brains enable row level security;
+alter table generated_content enable row level security;
+alter table content_opportunities enable row level security;
+alter table media_library enable row level security;
+alter table social_accounts enable row level security;
+alter table analytics_events enable row level security;
+alter table integration_connections enable row level security;
+
+drop policy if exists "Users can manage their business profiles" on business_profiles;
+create policy "Users can manage their business profiles"
+on business_profiles for all
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+drop policy if exists "Users can manage their brand brain" on brand_brains;
+create policy "Users can manage their brand brain"
+on brand_brains for all
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+drop policy if exists "Users can manage their generated content" on generated_content;
+create policy "Users can manage their generated content"
+on generated_content for all
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+drop policy if exists "Users can manage their content opportunities" on content_opportunities;
+create policy "Users can manage their content opportunities"
+on content_opportunities for all
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+drop policy if exists "Users can manage their media library" on media_library;
+create policy "Users can manage their media library"
+on media_library for all
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+drop policy if exists "Users can manage their social accounts" on social_accounts;
+create policy "Users can manage their social accounts"
+on social_accounts for all
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+drop policy if exists "Users can manage their analytics events" on analytics_events;
+create policy "Users can manage their analytics events"
+on analytics_events for all
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+drop policy if exists "Users can manage their integrations" on integration_connections;
+create policy "Users can manage their integrations"
+on integration_connections for all
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
