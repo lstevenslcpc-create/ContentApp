@@ -157,7 +157,11 @@ function formatApiError(data: Record<string, unknown>, fallback: string) {
   const error = typeof data.error === "string" ? data.error : fallback;
   const warning = typeof data.warning === "string" ? data.warning : "";
   const warnings = Array.isArray(data.warnings) ? data.warnings.map(String).join(" ") : "";
-  const details = typeof data.details === "string" ? data.details : "";
+  const details = typeof data.details === "string"
+    ? data.details
+    : data.details && typeof data.details === "object" && "message" in data.details
+      ? String((data.details as { message?: unknown }).message || "")
+      : "";
   const env = data.env && typeof data.env === "object"
     ? Object.entries(data.env as Record<string, boolean>)
       .filter(([, present]) => !present)
