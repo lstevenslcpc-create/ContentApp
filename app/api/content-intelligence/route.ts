@@ -39,6 +39,47 @@ function envWarnings() {
     .map(([name]) => `${name} is not set in the server environment.`);
 }
 
+async function contentOpportunitySchemaCheck() {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { error } = await supabase
+      .from("content_opportunities")
+      .select([
+        "id",
+        "user_id",
+        "topic",
+        "explanation",
+        "strongest_emotional_hook",
+        "curiosity_angle",
+        "save_worthy_angle",
+        "share_worthy_angle",
+        "comment_bait_potential",
+        "emotional_trigger_category",
+        "virality_score",
+        "emotional_resonance_score",
+        "save_potential_score",
+        "trust_building_score",
+        "conversion_score",
+        "seo_score",
+        "pinterest_potential_score",
+        "ai_search_potential_score",
+        "visual_direction"
+      ].join(","))
+      .limit(1);
+
+    return {
+      ok: !error,
+      error: error?.message
+    };
+  } catch (error) {
+    const details = errorDetails(error);
+    return {
+      ok: false,
+      error: typeof details === "object" && details && "message" in details ? String(details.message) : "Unable to check content_opportunities schema."
+    };
+  }
+}
+
 function toOpportunityRow(opportunity: ContentOpportunity, userId: string) {
   return {
     user_id: userId,
@@ -105,6 +146,7 @@ export async function GET(request: Request) {
         ok: true,
         userDetected,
         env: getSupabaseEnvStatus(),
+        contentOpportunitiesSchema: await contentOpportunitySchemaCheck(),
         warnings: envWarnings()
       });
     }
@@ -139,6 +181,7 @@ export async function POST(request: Request) {
         ok: true,
         userDetected: Boolean(user.id),
         env: getSupabaseEnvStatus(),
+        contentOpportunitiesSchema: await contentOpportunitySchemaCheck(),
         warnings: envWarnings()
       });
     }
