@@ -91,17 +91,25 @@ function toLegacyOpportunityRow(opportunity: ContentOpportunity, userId: string)
 
 export async function GET(request: Request) {
   try {
-    const user = await requireApiUser(request);
     const url = new URL(request.url);
     if (url.searchParams.get("diagnostics") === "1") {
+      let userDetected = false;
+      try {
+        const user = await requireApiUser(request);
+        userDetected = Boolean(user.id);
+      } catch (authError) {
+        console.warn("[content-intelligence][diagnostics-auth]", errorDetails(authError));
+      }
+
       return NextResponse.json({
         ok: true,
-        userDetected: Boolean(user.id),
+        userDetected,
         env: getSupabaseEnvStatus(),
         warnings: envWarnings()
       });
     }
 
+    const user = await requireApiUser(request);
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase
       .from("content_opportunities")
