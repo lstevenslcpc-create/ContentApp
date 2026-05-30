@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { User } from "@supabase/supabase-js";
 import { BarChart3, Brain, CalendarDays, Clapperboard, Compass, FolderOpen, Home, Image, Plug, Settings, Sparkles, UserRound, WalletCards } from "lucide-react";
 import { AccountBadge } from "./AccountBadge";
 
@@ -20,7 +21,7 @@ const nav = [
   { href: "/settings", label: "Settings", icon: Settings }
 ];
 
-export function Sidebar() {
+export function Sidebar({ user, checkedAuth }: { user: User | null; checkedAuth: boolean }) {
   const pathname = usePathname();
 
   return (
@@ -52,7 +53,7 @@ export function Sidebar() {
           );
         })}
       </nav>
-      <AccountBadge />
+      <AccountBadge user={user} checkedAuth={checkedAuth} />
     </aside>
   );
 }

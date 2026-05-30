@@ -19,6 +19,7 @@ export function AuthPanel() {
   const [mode, setMode] = useState<"sign-in" | "sign-up">("sign-in");
   const [message, setMessage] = useState<Message | null>(null);
   const [loading, setLoading] = useState(false);
+  const [returnTo, setReturnTo] = useState("/brand-brain");
 
   useEffect(() => {
     if (!supabase) return;
@@ -26,6 +27,13 @@ export function AuthPanel() {
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => setUser(session?.user || null));
     return () => listener.subscription.unsubscribe();
   }, [supabase]);
+
+  useEffect(() => {
+    const next = new URLSearchParams(window.location.search).get("next");
+    if (next?.startsWith("/") && !next.startsWith("//") && next !== "/auth") {
+      setReturnTo(next);
+    }
+  }, []);
 
   async function submit(formData: FormData) {
     if (!supabase) {
@@ -47,7 +55,7 @@ export function AuthPanel() {
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/brand-brain`
+          emailRedirectTo: `${window.location.origin}/auth?next=${encodeURIComponent(returnTo)}`
         }
       });
 
@@ -59,8 +67,8 @@ export function AuthPanel() {
       }
 
       if (result.data.session) {
-        setMessage({ type: "success", text: "Account created. Opening your Brand Brain..." });
-        router.push("/brand-brain");
+        setMessage({ type: "success", text: "Account created. Opening your workspace..." });
+        router.push(returnTo);
         return;
       }
 
@@ -79,8 +87,8 @@ export function AuthPanel() {
       return;
     }
 
-    setMessage({ type: "success", text: "Signed in. Opening your Brand Brain..." });
-    router.push("/brand-brain");
+    setMessage({ type: "success", text: "Signed in. Opening your workspace..." });
+    router.push(returnTo);
   }
 
   async function signOut() {
@@ -102,8 +110,8 @@ export function AuthPanel() {
           </div>
         </div>
         <div className="mt-5 flex flex-wrap gap-2">
-          <Link href="/brand-brain" className="btn-primary bg-[#172a3a] hover:bg-[#22384a]">
-            Open Brand Brain
+          <Link href={returnTo} className="btn-primary bg-[#172a3a] hover:bg-[#22384a]">
+            Open workspace
             <ArrowRight size={16} />
           </Link>
           <button className="btn-secondary" onClick={signOut}>Sign out</button>
