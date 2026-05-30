@@ -11,6 +11,60 @@ type GeneratedPost = {
   script?: string;
 };
 
+function extractJsonObject(raw: string) {
+  const cleaned = raw
+    .trim()
+    .replace(/^```(?:json)?/i, "")
+    .replace(/```$/i, "")
+    .trim();
+
+  try {
+    return JSON.parse(cleaned) as unknown;
+  } catch {
+    const firstBrace = cleaned.indexOf("{");
+    const lastBrace = cleaned.lastIndexOf("}");
+    if (firstBrace >= 0 && lastBrace > firstBrace) {
+      const sliced = cleaned.slice(firstBrace, lastBrace + 1);
+      return JSON.parse(sliced) as unknown;
+    }
+    throw new Error("OpenAI returned invalid JSON that could not be repaired.");
+  }
+}
+
+function asNumber(value: unknown, fallback = 72) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.min(100, Math.max(0, Math.round(numeric)));
+}
+
+function asStringArray(value: unknown) {
+  if (Array.isArray(value)) return value.map(String).filter(Boolean);
+  if (typeof value === "string") {
+    return value.split(",").map((item) => item.trim()).filter(Boolean);
+  }
+  return [];
+}
+
+function normalizePlatformRecommendations(value: unknown) {
+  const fallback = {
+    tiktok_reels: "Lead with a direct inner-dialogue hook and one emotionally specific example.",
+    instagram_carousel: "Build a save-worthy carousel around hidden signs, then end with a gentle CTA.",
+    pinterest_pin: "Use a searchable symptom-list title with a clean infographic layout.",
+    blog_seo_article: "Turn the idea into a long-tail, AI-search-friendly article with clinical nuance.",
+    threads_post: "Write a concise observation that names the tension and invites reflection.",
+    email_newsletter: "Frame it as a therapist-authored note with one grounded takeaway."
+  };
+
+  if (!value || typeof value !== "object" || Array.isArray(value)) return fallback;
+  return { ...fallback, ...(value as Record<string, string>) };
+}
+
+function normalizeClinicalSensitivity(value: unknown): "low" | "medium" | "high" {
+  const normalized = String(value || "").toLowerCase();
+  if (normalized === "low" || normalized === "medium" || normalized === "high") return normalized;
+  return "medium";
+}
+
 export async function generateStructuredContent(profile: BusinessProfile, request: ContentGenerationRequest, brandBrain?: BrandBrain | null): Promise<GeneratedPost[]> {
   if (!process.env.OPENAI_API_KEY) {
     throw new Error("OPENAI_API_KEY is missing. Add it to generate content.");
@@ -32,7 +86,7 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
     throw new Error("OpenAI returned an empty response.");
   }
 
-  const parsed = JSON.parse(raw) as { posts?: GeneratedPost[] };
+  const parsed = extractJsonObject(raw) as { posts?: GeneratedPost[] };
   if (!Array.isArray(parsed.posts)) {
     throw new Error("OpenAI response did not include a posts array.");
   }
@@ -183,40 +237,51 @@ Make the ideas specific to therapy, clinical safety, LionHeart Therapy, products
   const raw = completion.choices[0]?.message?.content;
   if (!raw) throw new Error("OpenAI returned an empty content intelligence response.");
 
-  const parsed = JSON.parse(raw) as { opportunities?: ContentOpportunity[] };
-  if (!Array.isArray(parsed.opportunities)) {
+  const parsed = extractJsonObject(raw) as { opportunities?: Partial<ContentOpportunity>[] } | Partial<ContentOpportunity>[];
+  const rawOpportunities = Array.isArray(parsed) ? parsed : parsed.opportunities;
+
+  if (!Array.isArray(rawOpportunities)) {
     throw new Error("OpenAI response did not include an opportunities array.");
   }
 
-  return parsed.opportunities.map((opportunity) => ({
-    topic: String(opportunity.topic || "").trim(),
-    explanation: String(opportunity.explanation || "").trim(),
-    strongest_emotional_hook: String(opportunity.strongest_emotional_hook || "").trim(),
-    curiosity_angle: String(opportunity.curiosity_angle || "").trim(),
-    save_worthy_angle: String(opportunity.save_worthy_angle || "").trim(),
-    share_worthy_angle: String(opportunity.share_worthy_angle || "").trim(),
-    comment_bait_potential: String(opportunity.comment_bait_potential || "").trim(),
-    emotional_trigger_category: String(opportunity.emotional_trigger_category || "").trim(),
-    audience: String(opportunity.audience || "").trim(),
-    content_pillar: String(opportunity.content_pillar || "").trim(),
-    platform_recommendations: opportunity.platform_recommendations || {},
-    seo_keywords: Array.isArray(opportunity.seo_keywords) ? opportunity.seo_keywords.map(String) : [],
-    virality_score: Number(opportunity.virality_score || 0),
-    emotional_resonance_score: Number(opportunity.emotional_resonance_score || opportunity.emotional_engagement_score || 0),
-    save_potential_score: Number(opportunity.save_potential_score || 0),
-    trust_building_score: Number(opportunity.trust_building_score || 0),
-    conversion_score: Number(opportunity.conversion_score || 0),
-    seo_score: Number(opportunity.seo_score || opportunity.seo_opportunity_score || 0),
-    pinterest_potential_score: Number(opportunity.pinterest_potential_score || 0),
-    ai_search_potential_score: Number(opportunity.ai_search_potential_score || 0),
-    seo_opportunity_score: Number(opportunity.seo_opportunity_score || opportunity.seo_score || 0),
-    emotional_engagement_score: Number(opportunity.emotional_engagement_score || opportunity.emotional_resonance_score || 0),
-    emotional_angle: String(opportunity.emotional_angle || "").trim(),
-    visual_direction: String(opportunity.visual_direction || "").trim(),
-    product_tie_in: String(opportunity.product_tie_in || "").trim(),
-    service_tie_in: String(opportunity.service_tie_in || "").trim(),
-    cta: String(opportunity.cta || "").trim(),
-    clinical_sensitivity: ["low", "medium", "high"].includes(opportunity.clinical_sensitivity) ? opportunity.clinical_sensitivity : "medium",
-    status: "idea"
-  }));
+  const normalized = rawOpportunities.map((opportunity, index) => {
+    const topic = String(opportunity.topic || `${theme} content angle ${index + 1}`).trim();
+    const emotionalHook = String(opportunity.strongest_emotional_hook || `The part of ${theme} people rarely say out loud`).trim();
+    const seoScore = asNumber(opportunity.seo_score || opportunity.seo_opportunity_score);
+    const resonanceScore = asNumber(opportunity.emotional_resonance_score || opportunity.emotional_engagement_score, 78);
+
+    return {
+      topic,
+      explanation: String(opportunity.explanation || `A humanized LionHeart Therapy content angle about ${theme}, built around emotional specificity and clinical nuance.`).trim(),
+      strongest_emotional_hook: emotionalHook,
+      curiosity_angle: String(opportunity.curiosity_angle || "The hidden emotional pattern makes people want to keep reading.").trim(),
+      save_worthy_angle: String(opportunity.save_worthy_angle || "Gives the audience language they can return to later.").trim(),
+      share_worthy_angle: String(opportunity.share_worthy_angle || "Easy to send to someone who feels this but has not named it yet.").trim(),
+      comment_bait_potential: String(opportunity.comment_bait_potential || "What version of this shows up for you?").trim(),
+      emotional_trigger_category: String(opportunity.emotional_trigger_category || "hidden symptom recognition").trim(),
+      audience: String(opportunity.audience || "emotionally overwhelmed women").trim(),
+      content_pillar: String(opportunity.content_pillar || "Trust-building").trim(),
+      platform_recommendations: normalizePlatformRecommendations(opportunity.platform_recommendations),
+      seo_keywords: asStringArray(opportunity.seo_keywords).length ? asStringArray(opportunity.seo_keywords) : [theme, `${theme} therapy`, `signs of ${theme}`],
+      virality_score: asNumber(opportunity.virality_score, 74),
+      emotional_resonance_score: resonanceScore,
+      save_potential_score: asNumber(opportunity.save_potential_score, 80),
+      trust_building_score: asNumber(opportunity.trust_building_score, 82),
+      conversion_score: asNumber(opportunity.conversion_score, 70),
+      seo_score: seoScore,
+      pinterest_potential_score: asNumber(opportunity.pinterest_potential_score, 76),
+      ai_search_potential_score: asNumber(opportunity.ai_search_potential_score, 76),
+      seo_opportunity_score: asNumber(opportunity.seo_opportunity_score || seoScore),
+      emotional_engagement_score: asNumber(opportunity.emotional_engagement_score || resonanceScore),
+      emotional_angle: String(opportunity.emotional_angle || "Names a private emotional experience with compassion and clinical grounding.").trim(),
+      visual_direction: String(opportunity.visual_direction || "Clean notebook-style visual with soft cream background, muted navy text, and a specific inner-dialogue pull quote.").trim(),
+      product_tie_in: String(opportunity.product_tie_in || "").trim(),
+      service_tie_in: String(opportunity.service_tie_in || "").trim(),
+      cta: String(opportunity.cta || "Save this for later, and reach out when you are ready for support.").trim(),
+      clinical_sensitivity: normalizeClinicalSensitivity(opportunity.clinical_sensitivity),
+      status: "idea"
+    } satisfies ContentOpportunity;
+  });
+
+  return normalized.filter((opportunity) => opportunity.topic);
 }

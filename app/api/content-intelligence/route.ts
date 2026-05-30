@@ -4,6 +4,31 @@ import { generateContentOpportunities } from "@/lib/openai";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import type { ContentOpportunity } from "@/lib/types";
 
+function errorDetails(error: unknown) {
+  if (error instanceof Error) {
+    return {
+      message: error.message,
+      name: error.name,
+      stack: process.env.NODE_ENV === "development" ? error.stack : undefined
+    };
+  }
+
+  if (typeof error === "object" && error !== null) {
+    return error;
+  }
+
+  return { message: String(error) };
+}
+
+function clientError(error: unknown, fallback: string) {
+  const details = errorDetails(error);
+  const message = typeof details === "object" && details && "message" in details ? String(details.message) : fallback;
+  return {
+    error: message || fallback,
+    details: process.env.NODE_ENV === "development" ? details : undefined
+  };
+}
+
 function toOpportunityRow(opportunity: ContentOpportunity, userId: string) {
   return {
     user_id: userId,
@@ -37,6 +62,23 @@ function toOpportunityRow(opportunity: ContentOpportunity, userId: string) {
   };
 }
 
+function toLegacyOpportunityRow(opportunity: ContentOpportunity, userId: string) {
+  return {
+    user_id: userId,
+    topic: opportunity.topic,
+    audience: opportunity.audience,
+    content_pillar: opportunity.content_pillar,
+    platform_recommendations: opportunity.platform_recommendations || {},
+    seo_keywords: opportunity.seo_keywords || [],
+    emotional_angle: opportunity.emotional_angle,
+    product_tie_in: opportunity.product_tie_in || null,
+    service_tie_in: opportunity.service_tie_in || null,
+    cta: opportunity.cta,
+    clinical_sensitivity: opportunity.clinical_sensitivity || "medium",
+    status: opportunity.status || "idea"
+  };
+}
+
 export async function GET(request: Request) {
   try {
     const user = await requireApiUser(request);
@@ -51,9 +93,10 @@ export async function GET(request: Request) {
     if (error) throw error;
     return NextResponse.json({ opportunities: data || [] });
   } catch (error) {
+    console.error("[content-intelligence][GET]", errorDetails(error));
     const authResponse = authErrorResponse(error);
     if (authResponse) return authResponse;
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to load content opportunities." }, { status: 500 });
+    return NextResponse.json(clientError(error, "Unable to load content opportunities."), { status: 500 });
   }
 }
 
@@ -62,6 +105,10 @@ export async function POST(request: Request) {
     const user = await requireApiUser(request);
     const body = await request.json();
     const action = body.action || "generate";
+    if (!process.env.OPENAI_API_KEY && action === "generate") {
+      return NextResponse.json({ error: "OPENAI_API_KEY is missing. Add it in Netlify environment variables and redeploy." }, { status: 500 });
+    }
+
     const supabase = getSupabaseAdmin();
 
     if (action === "generate") {
@@ -76,9 +123,11 @@ export async function POST(request: Request) {
         .eq("user_id", user.id)
         .maybeSingle();
 
-      if (brandBrainError) throw brandBrainError;
+      if (brandBrainError) {
+        console.warn("[content-intelligence][brand-brain-fallback]", errorDetails(brandBrainError));
+      }
 
-      const opportunities = await generateContentOpportunities(theme, brandBrain);
+      const opportunities = await generateContentOpportunities(theme, brandBrainError ? null : brandBrain);
       return NextResponse.json({
         opportunities,
         disclaimer: "AI-assisted content strategy suggestions. Live search and social trend APIs are not connected yet."
@@ -97,14 +146,38 @@ export async function POST(request: Request) {
         .select("*")
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.warn("[content-intelligence][save-full-row-failed]", errorDetails(error));
+        const { data: legacyData, error: legacyError } = await supabase
+          .from("content_opportunities")
+          .insert(toLegacyOpportunityRow(opportunity, user.id))
+          .select("*")
+          .single();
+
+        if (legacyError) {
+          console.error("[content-intelligence][save-legacy-row-failed]", errorDetails(legacyError));
+          return NextResponse.json(
+            {
+              error: legacyError.message || error.message || "Unable to save idea.",
+              details: process.env.NODE_ENV === "development" ? { fullRowError: error, legacyRowError: legacyError } : undefined
+            },
+            { status: 500 }
+          );
+        }
+
+        return NextResponse.json({
+          opportunity: legacyData,
+          warning: "Saved with legacy content_opportunities columns. Run the latest Supabase SQL migration to store the upgraded Content Intelligence fields."
+        });
+      }
       return NextResponse.json({ opportunity: data });
     }
 
     return NextResponse.json({ error: "Unsupported content intelligence action." }, { status: 400 });
   } catch (error) {
+    console.error("[content-intelligence][POST]", errorDetails(error));
     const authResponse = authErrorResponse(error);
     if (authResponse) return authResponse;
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to process content intelligence request." }, { status: 500 });
+    return NextResponse.json(clientError(error, "Unable to process content intelligence request."), { status: 500 });
   }
 }

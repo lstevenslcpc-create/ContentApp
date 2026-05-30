@@ -142,6 +142,24 @@ const prettyAngleLabels = {
   email_newsletter: "Email newsletter"
 };
 
+async function readApiResponse(response: Response) {
+  const text = await response.text();
+  if (!text) return {};
+
+  try {
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    return { error: `Server returned a non-JSON response (${response.status}): ${text.slice(0, 240)}` };
+  }
+}
+
+function formatApiError(data: Record<string, unknown>, fallback: string) {
+  const error = typeof data.error === "string" ? data.error : fallback;
+  const warning = typeof data.warning === "string" ? data.warning : "";
+  const details = typeof data.details === "string" ? data.details : "";
+  return [error, warning, details].filter(Boolean).join(" ");
+}
+
 export function ContentIntelligenceClient() {
   const [theme, setTheme] = useState("teen anxiety");
   const [opportunities, setOpportunities] = useState<ContentOpportunity[]>(starterOpportunities);
@@ -159,77 +177,93 @@ export function ContentIntelligenceClient() {
   async function generate() {
     setLoading(true);
     setMessage("");
-    const response = await authedFetch("/api/content-intelligence", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "generate", theme })
-    });
-    const data = await response.json();
-    setLoading(false);
-    if (!response.ok) {
-      setMessage(data.error || "Unable to generate content opportunities.");
-      return;
+    try {
+      const response = await authedFetch("/api/content-intelligence", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "generate", theme })
+      });
+      const data = await readApiResponse(response);
+      setLoading(false);
+      if (!response.ok) {
+        setMessage(formatApiError(data, "Unable to generate content opportunities."));
+        return;
+      }
+      setOpportunities(Array.isArray(data.opportunities) ? data.opportunities as ContentOpportunity[] : []);
+      setMessage(typeof data.disclaimer === "string" ? data.disclaimer : "AI-assisted content strategy suggestions generated.");
+    } catch (error) {
+      setLoading(false);
+      setMessage(error instanceof Error ? error.message : "Network error while generating content opportunities.");
     }
-    setOpportunities(data.opportunities || []);
-    setMessage(data.disclaimer || "AI-assisted content strategy suggestions generated.");
   }
 
   async function saveIdea(opportunity: ContentOpportunity) {
     setBusyTopic(opportunity.topic);
     setMessage("");
-    const response = await authedFetch("/api/content-intelligence", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "save", opportunity })
-    });
-    const data = await response.json();
-    setBusyTopic("");
-    if (!response.ok) {
-      setMessage(data.error || "Unable to save idea.");
-      return;
+    try {
+      const response = await authedFetch("/api/content-intelligence", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "save", opportunity })
+      });
+      const data = await readApiResponse(response);
+      setBusyTopic("");
+      if (!response.ok) {
+        setMessage(formatApiError(data, "Unable to save idea."));
+        return;
+      }
+      setSaved((current) => ({ ...current, [opportunity.topic]: true }));
+      setMessage(typeof data.warning === "string" ? data.warning : "Idea saved as a draft content opportunity.");
+    } catch (error) {
+      setBusyTopic("");
+      setMessage(error instanceof Error ? error.message : "Network error while saving idea.");
     }
-    setSaved((current) => ({ ...current, [opportunity.topic]: true }));
-    setMessage("Idea saved as a draft content opportunity.");
   }
 
   async function generatePack(opportunity: ContentOpportunity) {
     setBusyTopic(opportunity.topic);
     setMessage("");
     const platform = pickPrimaryPlatform(opportunity);
-    const response = await authedFetch("/api/content/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        platform,
-        contentType: platform === "Pinterest" ? "post" : "carousel",
-        contentGoal: opportunity.content_pillar || "education",
-        numberOfPosts: 7,
-        intelligenceBrief: {
-          topic: opportunity.topic,
-          audience: opportunity.audience,
-          content_pillar: opportunity.content_pillar,
-          seo_keywords: opportunity.seo_keywords,
-          emotional_angle: opportunity.emotional_angle,
-          strongest_emotional_hook: opportunity.strongest_emotional_hook,
-          curiosity_angle: opportunity.curiosity_angle,
-          save_worthy_angle: opportunity.save_worthy_angle,
-          share_worthy_angle: opportunity.share_worthy_angle,
-          emotional_trigger_category: opportunity.emotional_trigger_category,
-          visual_direction: opportunity.visual_direction,
-          product_tie_in: opportunity.product_tie_in,
-          service_tie_in: opportunity.service_tie_in,
-          cta: opportunity.cta,
-          clinical_sensitivity: opportunity.clinical_sensitivity
-        }
-      })
-    });
-    const data = await response.json();
-    setBusyTopic("");
-    if (!response.ok) {
-      setMessage(data.error || "Unable to generate content pack. Make sure your Business Profile, Brand Brain, OpenAI key, and Supabase session are configured.");
-      return;
+    try {
+      const response = await authedFetch("/api/content/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          platform,
+          contentType: platform === "Pinterest" ? "post" : "carousel",
+          contentGoal: opportunity.content_pillar || "education",
+          numberOfPosts: 7,
+          intelligenceBrief: {
+            topic: opportunity.topic,
+            audience: opportunity.audience,
+            content_pillar: opportunity.content_pillar,
+            seo_keywords: opportunity.seo_keywords,
+            emotional_angle: opportunity.emotional_angle,
+            strongest_emotional_hook: opportunity.strongest_emotional_hook,
+            curiosity_angle: opportunity.curiosity_angle,
+            save_worthy_angle: opportunity.save_worthy_angle,
+            share_worthy_angle: opportunity.share_worthy_angle,
+            emotional_trigger_category: opportunity.emotional_trigger_category,
+            visual_direction: opportunity.visual_direction,
+            product_tie_in: opportunity.product_tie_in,
+            service_tie_in: opportunity.service_tie_in,
+            cta: opportunity.cta,
+            clinical_sensitivity: opportunity.clinical_sensitivity
+          }
+        })
+      });
+      const data = await readApiResponse(response);
+      setBusyTopic("");
+      if (!response.ok) {
+        setMessage(formatApiError(data, "Unable to generate content pack. Make sure your Business Profile, Brand Brain, OpenAI key, and Supabase session are configured."));
+        return;
+      }
+      const posts = Array.isArray(data.posts) ? data.posts : [];
+      setMessage(`Generated ${posts.length} content drafts from "${opportunity.topic}". Open Content Generator or Calendar to review them.`);
+    } catch (error) {
+      setBusyTopic("");
+      setMessage(error instanceof Error ? error.message : "Network error while generating content pack.");
     }
-    setMessage(`Generated ${data.posts?.length || 0} content drafts from "${opportunity.topic}". Open Content Generator or Calendar to review them.`);
   }
 
   return (
