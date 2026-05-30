@@ -32,6 +32,17 @@ function clientError(error: unknown, fallback: string) {
   };
 }
 
+function safeMessage(error: unknown) {
+  const details = errorDetails(error);
+  if (typeof details === "object" && details && "message" in details) return String(details.message || "");
+  return fallbackString(error);
+}
+
+function fallbackString(error: unknown) {
+  if (typeof error === "string") return error;
+  return "Unknown error";
+}
+
 function envWarnings() {
   const env = getSupabaseEnvStatus();
   return Object.entries(env)
@@ -219,6 +230,7 @@ export async function POST(request: Request) {
     if (action === "generate") {
       const theme = String(body.theme || "").trim();
       if (!theme) {
+        console.warn("[content-intelligence][validation-failed]", { reason: "missing theme" });
         return NextResponse.json({ error: "Enter a theme to generate content opportunities." }, { status: 400 });
       }
 
@@ -246,11 +258,28 @@ export async function POST(request: Request) {
         warnings.push(message);
       }
 
-      const opportunities = await generateContentOpportunities(theme, brandBrain);
+      let generated;
+      try {
+        generated = await generateContentOpportunities(theme, brandBrain);
+      } catch (openAiError) {
+        console.error("[content-intelligence][openai-generation-failed]", errorDetails(openAiError));
+        return NextResponse.json(
+          {
+            error: "Content Intelligence could not generate opportunities.",
+            details: {
+              message: safeMessage(openAiError)
+            },
+            warnings,
+            env: getSupabaseEnvStatus()
+          },
+          { status: 500 }
+        );
+      }
+
       return NextResponse.json({
-        opportunities,
+        opportunities: generated.opportunities,
         disclaimer: "AI-assisted content strategy suggestions. Live search and social trend APIs are not connected yet.",
-        warnings: warnings.length ? warnings : undefined,
+        warnings: [...warnings, ...generated.warnings].length ? [...warnings, ...generated.warnings] : undefined,
         env: getSupabaseEnvStatus()
       });
     }
@@ -259,6 +288,7 @@ export async function POST(request: Request) {
       const supabase = getSupabaseAdmin();
       const opportunity = body.opportunity as ContentOpportunity | undefined;
       if (!opportunity?.topic) {
+        console.warn("[content-intelligence][save-validation-failed]", { reason: "missing opportunity topic" });
         return NextResponse.json({ error: "A content opportunity is required." }, { status: 400 });
       }
 

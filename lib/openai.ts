@@ -11,6 +11,11 @@ type GeneratedPost = {
   script?: string;
 };
 
+type ParsedContentOpportunities = {
+  opportunities: ContentOpportunity[];
+  warnings: string[];
+};
+
 function extractJsonObject(raw: string) {
   const cleaned = raw
     .trim()
@@ -29,6 +34,12 @@ function extractJsonObject(raw: string) {
     }
     throw new Error("OpenAI returned invalid JSON that could not be repaired.");
   }
+}
+
+function safeErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "object" && error !== null && "message" in error) return String((error as { message?: unknown }).message || "Unknown error");
+  return String(error || "Unknown error");
 }
 
 function asNumber(value: unknown, fallback = 72) {
@@ -63,6 +74,86 @@ function normalizeClinicalSensitivity(value: unknown): "low" | "medium" | "high"
   const normalized = String(value || "").toLowerCase();
   if (normalized === "low" || normalized === "medium" || normalized === "high") return normalized;
   return "medium";
+}
+
+function fallbackContentOpportunities(theme: string): ContentOpportunity[] {
+  const baseTopic = theme.trim() || "therapy content";
+  return [
+    {
+      topic: `What ${baseTopic} can look like when it is easy to hide`,
+      explanation: `A fallback content angle about ${baseTopic} that names hidden emotional patterns in a clinically safe, human way.`,
+      strongest_emotional_hook: `If ${baseTopic} looks quiet from the outside but loud on the inside...`,
+      curiosity_angle: "Names a private experience people may recognize before they have language for it.",
+      save_worthy_angle: "Gives the audience a simple phrase to come back to later.",
+      share_worthy_angle: "Easy to send to someone who feels the same pattern but has not named it yet.",
+      comment_bait_potential: "What part of this feels most familiar?",
+      emotional_trigger_category: "hidden symptom recognition",
+      audience: "emotionally overwhelmed women",
+      content_pillar: "Trust-building",
+      platform_recommendations: normalizePlatformRecommendations({}),
+      seo_keywords: [baseTopic, `${baseTopic} therapy`, `signs of ${baseTopic}`],
+      virality_score: 68,
+      emotional_resonance_score: 78,
+      save_potential_score: 76,
+      trust_building_score: 82,
+      conversion_score: 62,
+      seo_score: 70,
+      pinterest_potential_score: 70,
+      ai_search_potential_score: 70,
+      seo_opportunity_score: 70,
+      emotional_engagement_score: 78,
+      emotional_angle: "Validates a subtle internal experience without overpromising or diagnosing.",
+      visual_direction: "Soft notebook-style carousel with muted navy text, cream background, and one inner-dialogue pull quote.",
+      product_tie_in: "",
+      service_tie_in: "Anxiety Therapy",
+      cta: "Save this for later, and reach out when you are ready for support.",
+      clinical_sensitivity: "medium",
+      status: "idea"
+    }
+  ];
+}
+
+function normalizeOpportunity(opportunity: Partial<ContentOpportunity>, theme: string, index: number): ContentOpportunity {
+  const topic = String(opportunity.topic || `${theme} content angle ${index + 1}`).trim();
+  const emotionalHook = String(opportunity.strongest_emotional_hook || `The part of ${theme} people rarely say out loud`).trim();
+  const seoScore = asNumber(opportunity.seo_score || opportunity.seo_opportunity_score);
+  const resonanceScore = asNumber(opportunity.emotional_resonance_score || opportunity.emotional_engagement_score, 78);
+
+  if (!topic) {
+    throw new Error(`Opportunity ${index + 1} is missing a topic.`);
+  }
+
+  return {
+    topic,
+    explanation: String(opportunity.explanation || `A humanized LionHeart Therapy content angle about ${theme}, built around emotional specificity and clinical nuance.`).trim(),
+    strongest_emotional_hook: emotionalHook,
+    curiosity_angle: String(opportunity.curiosity_angle || "The hidden emotional pattern makes people want to keep reading.").trim(),
+    save_worthy_angle: String(opportunity.save_worthy_angle || "Gives the audience language they can return to later.").trim(),
+    share_worthy_angle: String(opportunity.share_worthy_angle || "Easy to send to someone who feels this but has not named it yet.").trim(),
+    comment_bait_potential: String(opportunity.comment_bait_potential || "What version of this shows up for you?").trim(),
+    emotional_trigger_category: String(opportunity.emotional_trigger_category || "hidden symptom recognition").trim(),
+    audience: String(opportunity.audience || "emotionally overwhelmed women").trim(),
+    content_pillar: String(opportunity.content_pillar || "Trust-building").trim(),
+    platform_recommendations: normalizePlatformRecommendations(opportunity.platform_recommendations),
+    seo_keywords: asStringArray(opportunity.seo_keywords).length ? asStringArray(opportunity.seo_keywords) : [theme, `${theme} therapy`, `signs of ${theme}`],
+    virality_score: asNumber(opportunity.virality_score, 74),
+    emotional_resonance_score: resonanceScore,
+    save_potential_score: asNumber(opportunity.save_potential_score, 80),
+    trust_building_score: asNumber(opportunity.trust_building_score, 82),
+    conversion_score: asNumber(opportunity.conversion_score, 70),
+    seo_score: seoScore,
+    pinterest_potential_score: asNumber(opportunity.pinterest_potential_score, 76),
+    ai_search_potential_score: asNumber(opportunity.ai_search_potential_score, 76),
+    seo_opportunity_score: asNumber(opportunity.seo_opportunity_score || seoScore),
+    emotional_engagement_score: asNumber(opportunity.emotional_engagement_score || resonanceScore),
+    emotional_angle: String(opportunity.emotional_angle || "Names a private emotional experience with compassion and clinical grounding.").trim(),
+    visual_direction: String(opportunity.visual_direction || "Clean notebook-style visual with soft cream background, muted navy text, and a specific inner-dialogue pull quote.").trim(),
+    product_tie_in: String(opportunity.product_tie_in || "").trim(),
+    service_tie_in: String(opportunity.service_tie_in || "").trim(),
+    cta: String(opportunity.cta || "Save this for later, and reach out when you are ready for support.").trim(),
+    clinical_sensitivity: normalizeClinicalSensitivity(opportunity.clinical_sensitivity),
+    status: "idea"
+  };
 }
 
 export async function generateStructuredContent(profile: BusinessProfile, request: ContentGenerationRequest, brandBrain?: BrandBrain | null): Promise<GeneratedPost[]> {
@@ -100,24 +191,27 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
   }));
 }
 
-export async function generateContentOpportunities(theme: string, brandBrain?: BrandBrain | null): Promise<ContentOpportunity[]> {
+export async function generateContentOpportunities(theme: string, brandBrain?: BrandBrain | null): Promise<ParsedContentOpportunities> {
   if (!process.env.OPENAI_API_KEY) {
     throw new Error("OPENAI_API_KEY is missing. Add it to generate content intelligence.");
   }
 
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  const completion = await client.chat.completions.create({
-    model: "gpt-4o-mini",
-    temperature: 0.82,
-    response_format: { type: "json_object" },
-    messages: [
-      {
-        role: "system",
-        content: "Return only valid JSON. You are a therapist-creator content strategist. Do not claim access to live trend APIs, live search volume, or real-time social data. Avoid generic wellness language."
-      },
-      {
-        role: "user",
-        content: `
+  let completion;
+
+  try {
+    completion = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      temperature: 0.82,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content: "Return only valid JSON. You are a therapist-creator content strategist. Do not claim access to live trend APIs, live search volume, or real-time social data. Avoid generic wellness language."
+        },
+        {
+          role: "user",
+          content: `
 You are the Humanized Content Intelligence Engine for LionHeart Therapy.
 
 Generate 6 AI-assisted content strategy opportunities for the broad theme: "${theme}".
@@ -208,16 +302,16 @@ Return strict JSON only:
         "email_newsletter": "Therapist-authored newsletter angle"
       },
       "seo_keywords": ["long-tail keyword"],
-      "virality_score": 1-100,
-      "emotional_resonance_score": 1-100,
-      "save_potential_score": 1-100,
-      "trust_building_score": 1-100,
-      "conversion_score": 1-100,
-      "seo_score": 1-100,
-      "pinterest_potential_score": 1-100,
-      "ai_search_potential_score": 1-100,
-      "seo_opportunity_score": 1-100,
-      "emotional_engagement_score": 1-100,
+      "virality_score": 84,
+      "emotional_resonance_score": 91,
+      "save_potential_score": 88,
+      "trust_building_score": 86,
+      "conversion_score": 74,
+      "seo_score": 82,
+      "pinterest_potential_score": 79,
+      "ai_search_potential_score": 81,
+      "seo_opportunity_score": 82,
+      "emotional_engagement_score": 91,
       "emotional_angle": "Emotional reason this resonates",
       "visual_direction": "Specific Canva/photo/video aesthetic direction",
       "product_tie_in": "Relevant product or empty string",
@@ -230,58 +324,74 @@ Return strict JSON only:
 
 Make the ideas specific to therapy, clinical safety, LionHeart Therapy, products/services, and the Brand Brain. Every output should feel less educational-generic and more like a therapist creator naming the thing the audience has felt but not had words for.
 `
-      }
-    ]
-  });
+        }
+      ]
+    });
+  } catch (error) {
+    console.error("[openai][content-intelligence][request-failed]", {
+      message: safeErrorMessage(error),
+      name: error instanceof Error ? error.name : undefined
+    });
+    throw new Error(`OpenAI request failed: ${safeErrorMessage(error)}`);
+  }
 
   const raw = completion.choices[0]?.message?.content;
   if (!raw) throw new Error("OpenAI returned an empty content intelligence response.");
 
-  const parsed = extractJsonObject(raw) as { opportunities?: Partial<ContentOpportunity>[] } | Partial<ContentOpportunity>[];
+  console.info("[openai][content-intelligence][response-received]", {
+    finishReason: completion.choices[0]?.finish_reason,
+    contentLength: raw.length
+  });
+
+  let parsed: { opportunities?: Partial<ContentOpportunity>[] } | Partial<ContentOpportunity>[];
+  const warnings: string[] = [];
+
+  try {
+    parsed = extractJsonObject(raw) as { opportunities?: Partial<ContentOpportunity>[] } | Partial<ContentOpportunity>[];
+  } catch (error) {
+    console.error("[openai][content-intelligence][json-parse-failed]", {
+      message: safeErrorMessage(error),
+      preview: raw.slice(0, 500)
+    });
+
+    return {
+      opportunities: fallbackContentOpportunities(theme),
+      warnings: [`OpenAI returned malformed JSON, so a safe fallback idea was generated instead. Parser detail: ${safeErrorMessage(error)}`]
+    };
+  }
+
   const rawOpportunities = Array.isArray(parsed) ? parsed : parsed.opportunities;
 
   if (!Array.isArray(rawOpportunities)) {
-    throw new Error("OpenAI response did not include an opportunities array.");
-  }
-
-  const normalized = rawOpportunities.map((opportunity, index) => {
-    const topic = String(opportunity.topic || `${theme} content angle ${index + 1}`).trim();
-    const emotionalHook = String(opportunity.strongest_emotional_hook || `The part of ${theme} people rarely say out loud`).trim();
-    const seoScore = asNumber(opportunity.seo_score || opportunity.seo_opportunity_score);
-    const resonanceScore = asNumber(opportunity.emotional_resonance_score || opportunity.emotional_engagement_score, 78);
+    console.error("[openai][content-intelligence][validation-failed]", {
+      parsedType: Array.isArray(parsed) ? "array" : typeof parsed,
+      keys: typeof parsed === "object" && parsed !== null ? Object.keys(parsed) : []
+    });
 
     return {
-      topic,
-      explanation: String(opportunity.explanation || `A humanized LionHeart Therapy content angle about ${theme}, built around emotional specificity and clinical nuance.`).trim(),
-      strongest_emotional_hook: emotionalHook,
-      curiosity_angle: String(opportunity.curiosity_angle || "The hidden emotional pattern makes people want to keep reading.").trim(),
-      save_worthy_angle: String(opportunity.save_worthy_angle || "Gives the audience language they can return to later.").trim(),
-      share_worthy_angle: String(opportunity.share_worthy_angle || "Easy to send to someone who feels this but has not named it yet.").trim(),
-      comment_bait_potential: String(opportunity.comment_bait_potential || "What version of this shows up for you?").trim(),
-      emotional_trigger_category: String(opportunity.emotional_trigger_category || "hidden symptom recognition").trim(),
-      audience: String(opportunity.audience || "emotionally overwhelmed women").trim(),
-      content_pillar: String(opportunity.content_pillar || "Trust-building").trim(),
-      platform_recommendations: normalizePlatformRecommendations(opportunity.platform_recommendations),
-      seo_keywords: asStringArray(opportunity.seo_keywords).length ? asStringArray(opportunity.seo_keywords) : [theme, `${theme} therapy`, `signs of ${theme}`],
-      virality_score: asNumber(opportunity.virality_score, 74),
-      emotional_resonance_score: resonanceScore,
-      save_potential_score: asNumber(opportunity.save_potential_score, 80),
-      trust_building_score: asNumber(opportunity.trust_building_score, 82),
-      conversion_score: asNumber(opportunity.conversion_score, 70),
-      seo_score: seoScore,
-      pinterest_potential_score: asNumber(opportunity.pinterest_potential_score, 76),
-      ai_search_potential_score: asNumber(opportunity.ai_search_potential_score, 76),
-      seo_opportunity_score: asNumber(opportunity.seo_opportunity_score || seoScore),
-      emotional_engagement_score: asNumber(opportunity.emotional_engagement_score || resonanceScore),
-      emotional_angle: String(opportunity.emotional_angle || "Names a private emotional experience with compassion and clinical grounding.").trim(),
-      visual_direction: String(opportunity.visual_direction || "Clean notebook-style visual with soft cream background, muted navy text, and a specific inner-dialogue pull quote.").trim(),
-      product_tie_in: String(opportunity.product_tie_in || "").trim(),
-      service_tie_in: String(opportunity.service_tie_in || "").trim(),
-      cta: String(opportunity.cta || "Save this for later, and reach out when you are ready for support.").trim(),
-      clinical_sensitivity: normalizeClinicalSensitivity(opportunity.clinical_sensitivity),
-      status: "idea"
-    } satisfies ContentOpportunity;
+      opportunities: fallbackContentOpportunities(theme),
+      warnings: ["OpenAI response did not include an opportunities array, so a safe fallback idea was generated instead."]
+    };
+  }
+
+  const normalized = rawOpportunities.flatMap((opportunity, index) => {
+    try {
+      return [normalizeOpportunity(opportunity, theme, index)];
+    } catch (error) {
+      const message = safeErrorMessage(error);
+      console.warn("[openai][content-intelligence][opportunity-validation-failed]", {
+        index,
+        message
+      });
+      warnings.push(`Skipped malformed opportunity ${index + 1}: ${message}`);
+      return [];
+    }
   });
 
-  return normalized.filter((opportunity) => opportunity.topic);
+  if (!normalized.length) {
+    warnings.push("All OpenAI opportunities were malformed, so a safe fallback idea was generated instead.");
+    return { opportunities: fallbackContentOpportunities(theme), warnings };
+  }
+
+  return { opportunities: normalized, warnings };
 }
