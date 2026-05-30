@@ -18,9 +18,21 @@ function getSupabaseAuthClient() {
   });
 }
 
+function getCookieToken(request: Request) {
+  const cookieHeader = request.headers.get("cookie") || "";
+  const match = cookieHeader
+    .split(";")
+    .map((cookie) => cookie.trim())
+    .find((cookie) => cookie.startsWith("lh_supabase_access_token="));
+
+  if (!match) return null;
+  return decodeURIComponent(match.slice("lh_supabase_access_token=".length));
+}
+
 export async function requireApiUser(request: Request): Promise<User> {
   const authHeader = request.headers.get("authorization");
-  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice("Bearer ".length) : null;
+  const headerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice("Bearer ".length) : null;
+  const token = headerToken || getCookieToken(request);
 
   if (!token) {
     throw new AuthError("Sign in is required for this workspace.");

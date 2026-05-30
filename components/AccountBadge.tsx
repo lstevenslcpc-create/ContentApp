@@ -5,6 +5,7 @@ import { LogIn, LogOut, UserCircle2 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { getSupabaseBrowserClient } from "@/lib/supabaseBrowser";
+import { clearSupabaseSessionCookie } from "@/lib/sessionCookie";
 
 export function AccountBadge({ user, checkedAuth }: { user: User | null; checkedAuth: boolean }) {
   const supabase = getSupabaseBrowserClient();
@@ -14,6 +15,7 @@ export function AccountBadge({ user, checkedAuth }: { user: User | null; checked
   async function signOut() {
     if (!supabase) return;
     await supabase.auth.signOut();
+    clearSupabaseSessionCookie();
     router.refresh();
   }
 

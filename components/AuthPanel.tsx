@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { getSupabaseBrowserClient } from "@/lib/supabaseBrowser";
+import { clearSupabaseSessionCookie, setSupabaseSessionCookie } from "@/lib/sessionCookie";
 
 type Message = {
   type: "success" | "error" | "info";
@@ -67,6 +68,7 @@ export function AuthPanel() {
       }
 
       if (result.data.session) {
+        setSupabaseSessionCookie(result.data.session.access_token, result.data.session.expires_in);
         setMessage({ type: "success", text: "Account created. Opening your workspace..." });
         router.push(returnTo);
         return;
@@ -87,6 +89,9 @@ export function AuthPanel() {
       return;
     }
 
+    if (result.data.session) {
+      setSupabaseSessionCookie(result.data.session.access_token, result.data.session.expires_in);
+    }
     setMessage({ type: "success", text: "Signed in. Opening your workspace..." });
     router.push(returnTo);
   }
@@ -94,6 +99,7 @@ export function AuthPanel() {
   async function signOut() {
     if (!supabase) return;
     await supabase.auth.signOut();
+    clearSupabaseSessionCookie();
     setMessage({ type: "info", text: "Signed out." });
   }
 

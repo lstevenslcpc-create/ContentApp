@@ -71,6 +71,8 @@ async function schemaFieldsExist(table: string, fields: string[]) {
 
 export async function getContentIntelligenceDiagnostics(request: Request) {
   let userDetected = false;
+  const authHeaderReceived = Boolean(request.headers.get("authorization")?.startsWith("Bearer "));
+  const authCookieReceived = request.headers.get("cookie")?.includes("lh_supabase_access_token=") || false;
 
   try {
     const user = await requireApiUser(request);
@@ -84,6 +86,8 @@ export async function getContentIntelligenceDiagnostics(request: Request) {
   const brandBrainsSchemaFieldsExist = await schemaFieldsExist("brand_brains", brandBrainFields);
 
   return {
+    authHeaderReceived,
+    authCookieReceived,
     userDetected,
     OPENAI_API_KEY: env.OPENAI_API_KEY,
     SUPABASE_URL: env.SUPABASE_URL,

@@ -6,6 +6,7 @@ import { LockKeyhole } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { getSupabaseBrowserClient } from "@/lib/supabaseBrowser";
+import { clearSupabaseSessionCookie, setSupabaseSessionCookie } from "@/lib/sessionCookie";
 import { Sidebar } from "./Sidebar";
 import { MobileBottomNav } from "./MobileBottomNav";
 
@@ -54,14 +55,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
 
     let mounted = true;
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getSession().then(({ data }) => {
       if (!mounted) return;
-      setUser(data.user || null);
+      setUser(data.session?.user || null);
+      if (data.session?.access_token) {
+        setSupabaseSessionCookie(data.session.access_token, data.session.expires_in);
+      } else {
+        clearSupabaseSessionCookie();
+      }
       setCheckedAuth(true);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null);
+      if (session?.access_token) {
+        setSupabaseSessionCookie(session.access_token, session.expires_in);
+      } else {
+        clearSupabaseSessionCookie();
+      }
       setCheckedAuth(true);
     });
 

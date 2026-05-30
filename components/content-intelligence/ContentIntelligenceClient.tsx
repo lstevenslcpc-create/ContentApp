@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, BookmarkPlus, Brain, Lightbulb, Loader2, Mail, Newspaper, Pin, Search, Sparkles, Video } from "lucide-react";
 import { authedFetch } from "@/lib/apiClient";
 import type { ContentOpportunity, PlatformAngles } from "@/lib/types";
@@ -142,6 +142,18 @@ const prettyAngleLabels = {
   email_newsletter: "Email newsletter"
 };
 
+type DiagnosticsState = {
+  authHeaderReceived?: boolean;
+  authCookieReceived?: boolean;
+  userDetected?: boolean;
+  OPENAI_API_KEY?: boolean;
+  SUPABASE_URL?: boolean;
+  SUPABASE_SERVICE_ROLE_KEY?: boolean;
+  OAUTH_TOKEN_ENCRYPTION_KEY?: boolean;
+  contentOpportunitiesSchemaFieldsExist?: boolean;
+  brandBrainsSchemaFieldsExist?: boolean;
+};
+
 async function readApiResponse(response: Response) {
   const text = await response.text();
   if (!text) return {};
@@ -171,6 +183,18 @@ function formatApiError(data: Record<string, unknown>, fallback: string) {
   return [error, warning, warnings, details, env].filter(Boolean).join(" ");
 }
 
+function diagnosticsFailureReason(diagnostics: DiagnosticsState | null) {
+  if (!diagnostics) return "";
+  if (!diagnostics.authHeaderReceived && !diagnostics.authCookieReceived) return "No Supabase access token reached the API. Sign out, sign back in, then try again.";
+  if (!diagnostics.userDetected) return "The API received a token, but Supabase did not validate the user session. Please sign in again.";
+  if (!diagnostics.OPENAI_API_KEY) return "OPENAI_API_KEY is missing in production.";
+  if (!diagnostics.SUPABASE_URL) return "SUPABASE_URL is missing in production.";
+  if (!diagnostics.SUPABASE_SERVICE_ROLE_KEY) return "SUPABASE_SERVICE_ROLE_KEY is missing in production.";
+  if (!diagnostics.contentOpportunitiesSchemaFieldsExist) return "The content_opportunities table is missing required upgraded fields.";
+  if (!diagnostics.brandBrainsSchemaFieldsExist) return "The brand_brains table is missing required upgraded fields.";
+  return "";
+}
+
 export function ContentIntelligenceClient() {
   const [theme, setTheme] = useState("teen anxiety");
   const [opportunities, setOpportunities] = useState<ContentOpportunity[]>(starterOpportunities);
@@ -178,6 +202,22 @@ export function ContentIntelligenceClient() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [busyTopic, setBusyTopic] = useState("");
+  const [diagnostics, setDiagnostics] = useState<DiagnosticsState | null>(null);
+
+  async function refreshDiagnostics() {
+    try {
+      const response = await authedFetch("/api/content-intelligence/diagnostics");
+      const data = await readApiResponse(response);
+      setDiagnostics(data as DiagnosticsState);
+      return data as DiagnosticsState;
+    } catch {
+      return null;
+    }
+  }
+
+  useEffect(() => {
+    void refreshDiagnostics();
+  }, []);
 
   const topScores = useMemo(() => {
     const seo = Math.round(opportunities.reduce((sum, item) => sum + (item.seo_score || item.seo_opportunity_score || 0), 0) / Math.max(opportunities.length, 1));
@@ -197,10 +237,13 @@ export function ContentIntelligenceClient() {
       const data = await readApiResponse(response);
       setLoading(false);
       if (!response.ok) {
-        setMessage(formatApiError(data, "Unable to generate content opportunities."));
+        const latestDiagnostics = await refreshDiagnostics();
+        const reason = diagnosticsFailureReason(latestDiagnostics);
+        setMessage([formatApiError(data, "Unable to generate content opportunities."), reason].filter(Boolean).join(" "));
         return;
       }
       setOpportunities(Array.isArray(data.opportunities) ? data.opportunities as ContentOpportunity[] : []);
+      void refreshDiagnostics();
       const warnings = Array.isArray(data.warnings) ? ` ${data.warnings.map(String).join(" ")}` : "";
       setMessage(`${typeof data.disclaimer === "string" ? data.disclaimer : "AI-assisted content strategy suggestions generated."}${warnings}`);
     } catch (error) {
@@ -323,6 +366,11 @@ export function ContentIntelligenceClient() {
           ))}
         </div>
         {message && <p className="mt-4 rounded-xl bg-[#eef3ec] p-3 text-sm font-semibold leading-6 text-[#4f6f5a]">{message}</p>}
+        {diagnostics && (
+          <p className="mt-3 rounded-xl bg-[#fffdf8] p-3 text-xs font-semibold leading-5 text-[#77633c]">
+            Session diagnostics: token sent {diagnostics.authHeaderReceived || diagnostics.authCookieReceived ? "yes" : "no"} · user detected {diagnostics.userDetected ? "yes" : "no"} · OpenAI {diagnostics.OPENAI_API_KEY ? "ready" : "missing"} · Supabase {diagnostics.SUPABASE_URL && diagnostics.SUPABASE_SERVICE_ROLE_KEY ? "ready" : "missing"} · Content schema {diagnostics.contentOpportunitiesSchemaFieldsExist ? "ready" : "missing"} · Brand Brain schema {diagnostics.brandBrainsSchemaFieldsExist ? "ready" : "missing"}
+          </p>
+        )}
       </section>
 
       <section>
