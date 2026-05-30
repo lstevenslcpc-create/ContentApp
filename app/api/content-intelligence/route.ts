@@ -228,7 +228,16 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const routeDebug: Record<string, unknown> = {
+    checkpoint: "entered-route",
+    runtimeType: "nodejs",
+    nodeVersion: process.version,
+    keyExists: Boolean(process.env.OPENAI_API_KEY),
+    keyPreview: process.env.OPENAI_API_KEY ? process.env.OPENAI_API_KEY.slice(0, 5) : ""
+  };
+
   try {
+    console.info("[content-intelligence][checkpoint]", routeDebug);
     const user = await requireApiUser(request);
     const body = await request.json();
     const action = body.action || "generate";
@@ -245,25 +254,32 @@ export async function POST(request: Request) {
     }
 
     if (!process.env.OPENAI_API_KEY && action === "generate") {
+      routeDebug.checkpoint = "env-var-missing";
+      console.warn("[content-intelligence][checkpoint]", routeDebug);
       return NextResponse.json({
         ok: false,
         error: "OpenAI is not configured in production. Add OPENAI_API_KEY in Netlify environment variables and redeploy.",
         details: { message: "OpenAI is not configured in production. Add OPENAI_API_KEY in Netlify environment variables and redeploy." },
-        env: getSupabaseEnvStatus()
+        env: getSupabaseEnvStatus(),
+        debug: routeDebug
       }, { status: 500 });
     }
 
     if (action === "generate") {
+      routeDebug.checkpoint = "generate-action-started";
+      console.info("[content-intelligence][checkpoint]", routeDebug);
       const theme = String(body.theme || "").trim();
       if (!theme) {
+        routeDebug.checkpoint = "validation-failed";
         console.warn("[content-intelligence][validation-failed]", { reason: "missing theme" });
-        return NextResponse.json({ ok: false, error: "Enter a theme to generate content opportunities.", details: { message: "Enter a theme to generate content opportunities." } }, { status: 400 });
+        return NextResponse.json({ ok: false, error: "Enter a theme to generate content opportunities.", details: { message: "Enter a theme to generate content opportunities." }, debug: routeDebug }, { status: 400 });
       }
 
       let brandBrain = null;
       const warnings = envWarnings();
 
       try {
+        routeDebug.checkpoint = "brand-brain-loading";
         const supabase = getSupabaseAdmin();
         const { data, error: brandBrainError } = await supabase
           .from("brand_brains")
@@ -286,8 +302,13 @@ export async function POST(request: Request) {
 
       let generated;
       try {
+        routeDebug.checkpoint = "openai-generation-starting";
+        console.info("[content-intelligence][checkpoint]", routeDebug);
         generated = await generateContentOpportunities(theme, brandBrain);
+        routeDebug.checkpoint = "openai-generation-completed";
+        console.info("[content-intelligence][checkpoint]", routeDebug);
       } catch (openAiError) {
+        routeDebug.checkpoint = "openai-generation-failed";
         console.error("[content-intelligence][openai-generation-failed]", errorDetails(openAiError));
         return NextResponse.json(
           {
@@ -300,6 +321,7 @@ export async function POST(request: Request) {
             warnings,
             env: getSupabaseEnvStatus(),
             debug: {
+              ...routeDebug,
               openAiResponseReceived: false,
               opportunitiesArrayParsed: false,
               opportunityCount: 0,
@@ -316,7 +338,7 @@ export async function POST(request: Request) {
         disclaimer: "AI-assisted content strategy suggestions. Live search and social trend APIs are not connected yet.",
         warnings: [...warnings, ...generated.warnings].length ? [...warnings, ...generated.warnings] : undefined,
         env: getSupabaseEnvStatus(),
-        debug: generated.debug
+        debug: { ...routeDebug, ...generated.debug }
       });
     }
 
@@ -368,9 +390,11 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: false, error: "Unsupported content intelligence action.", details: { message: "Unsupported content intelligence action." } }, { status: 400 });
   } catch (error) {
+    routeDebug.checkpoint = "route-unhandled-error";
     console.error("[content-intelligence][POST]", errorDetails(error));
     const authResponse = authErrorResponse(error);
     if (authResponse) return authResponse;
-    return NextResponse.json(clientError(error, "Unable to process content intelligence request."), { status: 500 });
+    const response = clientError(error, "Unable to process content intelligence request.");
+    return NextResponse.json({ ...response, debug: { ...response.debug, ...routeDebug } }, { status: 500 });
   }
 }

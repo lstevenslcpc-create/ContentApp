@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import type OpenAI from "openai";
 import type { BrandBrain, BusinessProfile, ContentGenerationRequest, ContentOpportunity } from "./types";
 import { buildContentPrompt } from "./contentPrompt";
 import { formatBrandBrainForPrompt } from "./brandBrain/format";
@@ -19,6 +19,13 @@ type ParsedContentOpportunities = {
     rawResponsePreview: string;
     opportunitiesArrayParsed: boolean;
     opportunityCount: number;
+    checkpoint?: string;
+    keyExists?: boolean;
+    keyPreview?: string;
+    runtimeType?: string;
+    nodeVersion?: string;
+    openAiClientInitialized?: boolean;
+    directFetchMinimalTestSucceeded?: boolean;
     modelUsed?: string;
     openAiStatusCode?: number | string;
     openAiErrorType?: string;
@@ -40,6 +47,13 @@ type SafeOpenAiError = {
 type ChatCompletionParams = Parameters<OpenAI["chat"]["completions"]["create"]>[0];
 
 type OpenAiGenerationDebug = {
+  checkpoint?: string;
+  keyExists?: boolean;
+  keyPreview?: string;
+  runtimeType?: string;
+  nodeVersion?: string;
+  openAiClientInitialized?: boolean;
+  directFetchMinimalTestSucceeded?: boolean;
   modelUsed?: string;
   openAiStatusCode?: number | string;
   openAiErrorType?: string;
@@ -103,6 +117,11 @@ function logOpenAiError(label: string, error: unknown) {
   return safe;
 }
 
+function keyPreview(apiKey: string | undefined) {
+  if (!apiKey) return "";
+  return apiKey.slice(0, 5);
+}
+
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
   let timeout: ReturnType<typeof setTimeout> | undefined;
   const timeoutPromise = new Promise<never>((_, reject) => {
@@ -150,6 +169,65 @@ async function createJsonCompletion(client: OpenAI, params: ChatCompletionParams
     client.chat.completions.create(request),
     45000,
     `OpenAI JSON generation for ${model}`
+  );
+}
+
+async function createOpenAiClient(apiKey: string): Promise<OpenAI> {
+  const { default: OpenAIClient } = await import("openai");
+  return new OpenAIClient({ apiKey });
+}
+
+async function directFetchChatCompletion(apiKey: string, params: ChatCompletionParams, model: string, useResponseFormat: boolean): Promise<NonStreamingCompletion> {
+  const response = await withTimeout(
+    fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        ...params,
+        model,
+        ...(useResponseFormat ? { response_format: { type: "json_object" } } : {})
+      })
+    }),
+    45000,
+    `OpenAI direct fetch generation for ${model}`
+  );
+
+  const text = await response.text();
+  let parsed: Record<string, unknown> = {};
+  try {
+    parsed = text ? JSON.parse(text) as Record<string, unknown> : {};
+  } catch {
+    parsed = { raw: text.slice(0, 1000) };
+  }
+
+  if (!response.ok) {
+    const errorInfo = parsed.error && typeof parsed.error === "object" ? parsed.error as Record<string, unknown> : parsed;
+    const error = new Error(String(errorInfo.message || `OpenAI direct fetch failed with status ${response.status}.`));
+    (error as Error & { status?: number; code?: string; type?: string }).status = response.status;
+    (error as Error & { status?: number; code?: string; type?: string }).code = typeof errorInfo.code === "string" ? errorInfo.code : undefined;
+    (error as Error & { status?: number; code?: string; type?: string }).type = typeof errorInfo.type === "string" ? errorInfo.type : undefined;
+    throw error;
+  }
+
+  return parsed as NonStreamingCompletion;
+}
+
+async function directFetchMinimalTest(apiKey: string, model: string) {
+  return directFetchChatCompletion(
+    apiKey,
+    {
+      model,
+      max_tokens: 24,
+      temperature: 0,
+      messages: [
+        { role: "user", content: "Reply with one short sentence confirming the connection works." }
+      ]
+    } as ChatCompletionParams,
+    model,
+    false
   );
 }
 
@@ -272,7 +350,7 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
     throw new Error("OPENAI_API_KEY is missing. Add it to generate content.");
   }
 
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const client = await createOpenAiClient(process.env.OPENAI_API_KEY);
   const completion = await client.chat.completions.create({
     model: "gpt-4o-mini",
     temperature: 0.75,
@@ -303,15 +381,49 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
 }
 
 export async function generateContentOpportunities(theme: string, brandBrain?: BrandBrain | null): Promise<ParsedContentOpportunities> {
-  if (!process.env.OPENAI_API_KEY) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
     throw new Error("OPENAI_API_KEY is missing. Add it to generate content intelligence.");
   }
 
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  console.info("[openai][content-intelligence][checkpoint]", {
+    checkpoint: "env-var-loaded",
+    keyExists: Boolean(apiKey),
+    keyPreview: keyPreview(apiKey),
+    runtimeType: "nodejs",
+    nodeVersion: process.version
+  });
+
   let completion: NonStreamingCompletion | null = null;
   const openAiDebug: OpenAiGenerationDebug = {
+    checkpoint: "env-var-loaded",
+    keyExists: Boolean(apiKey),
+    keyPreview: keyPreview(apiKey),
+    runtimeType: "nodejs",
+    nodeVersion: process.version,
+    openAiClientInitialized: false,
+    directFetchMinimalTestSucceeded: false,
     minimalTestSucceeded: false
   };
+
+  let client: OpenAI | null = null;
+
+  try {
+    openAiDebug.checkpoint = "openai-client-initializing";
+    console.info("[openai][content-intelligence][checkpoint]", {
+      checkpoint: openAiDebug.checkpoint,
+      sdkImportStyle: "dynamic default import from openai"
+    });
+    client = await createOpenAiClient(apiKey);
+    openAiDebug.openAiClientInitialized = true;
+    openAiDebug.checkpoint = "openai-client-initialized";
+    console.info("[openai][content-intelligence][checkpoint]", { checkpoint: openAiDebug.checkpoint });
+  } catch (error) {
+    const safe = logOpenAiError("[openai][content-intelligence][client-init-failed]", error);
+    openAiDebug.openAiStatusCode = safe.status;
+    openAiDebug.openAiErrorType = safe.type;
+    openAiDebug.openAiErrorCode = safe.code;
+  }
 
   const baseParams: ChatCompletionParams = {
     model: "gpt-4o-mini",
@@ -445,43 +557,97 @@ Make the ideas specific to therapy, clinical safety, LionHeart Therapy, products
   for (const model of modelCandidates()) {
     openAiDebug.modelUsed = model;
 
-    try {
-      const minimal = await minimalOpenAiTest(client, model);
-      openAiDebug.minimalTestSucceeded = true;
-      console.info("[openai][content-intelligence][minimal-test-succeeded]", {
-        model,
-        responseLength: minimal.choices[0]?.message?.content?.length || 0
-      });
-    } catch (error) {
-      const safe = logOpenAiError("[openai][content-intelligence][minimal-test-failed]", error);
-      errors.push(safe);
-      openAiDebug.openAiStatusCode = safe.status;
-      openAiDebug.openAiErrorType = safe.type;
-      openAiDebug.openAiErrorCode = safe.code;
-      continue;
-    }
-
-    for (const useResponseFormat of [true, false]) {
-      openAiDebug.responseFormatUsed = useResponseFormat;
-
+    if (client) {
       try {
-        completion = await createJsonCompletion(client, baseParams, model, useResponseFormat) as NonStreamingCompletion;
-        openAiDebug.modelUsed = model;
-        console.info("[openai][content-intelligence][generation-request-succeeded]", {
+        openAiDebug.checkpoint = "minimal-test-starting";
+        console.info("[openai][content-intelligence][checkpoint]", { checkpoint: openAiDebug.checkpoint, model });
+        const minimal = await minimalOpenAiTest(client, model);
+        openAiDebug.minimalTestSucceeded = true;
+        openAiDebug.checkpoint = "minimal-test-completed";
+        console.info("[openai][content-intelligence][minimal-test-succeeded]", {
+          checkpoint: openAiDebug.checkpoint,
           model,
-          responseFormatUsed: useResponseFormat
+          responseLength: minimal.choices[0]?.message?.content?.length || 0
         });
-        break;
       } catch (error) {
-        const safe = logOpenAiError("[openai][content-intelligence][generation-request-failed]", error);
+        const safe = logOpenAiError("[openai][content-intelligence][minimal-test-failed]", error);
         errors.push(safe);
         openAiDebug.openAiStatusCode = safe.status;
         openAiDebug.openAiErrorType = safe.type;
         openAiDebug.openAiErrorCode = safe.code;
+        continue;
+      }
 
-        const looksResponseFormatRelated = `${safe.message} ${safe.code || ""} ${safe.type || ""}`.toLowerCase().includes("response_format");
-        if (!useResponseFormat || !looksResponseFormatRelated) {
+      for (const useResponseFormat of [true, false]) {
+        openAiDebug.responseFormatUsed = useResponseFormat;
+
+        try {
+          openAiDebug.checkpoint = "json-generation-starting";
+          completion = await createJsonCompletion(client, baseParams, model, useResponseFormat) as NonStreamingCompletion;
+          openAiDebug.modelUsed = model;
+          openAiDebug.checkpoint = "json-generation-completed";
+          console.info("[openai][content-intelligence][generation-request-succeeded]", {
+            checkpoint: openAiDebug.checkpoint,
+            model,
+            responseFormatUsed: useResponseFormat
+          });
           break;
+        } catch (error) {
+          const safe = logOpenAiError("[openai][content-intelligence][generation-request-failed]", error);
+          errors.push(safe);
+          openAiDebug.openAiStatusCode = safe.status;
+          openAiDebug.openAiErrorType = safe.type;
+          openAiDebug.openAiErrorCode = safe.code;
+
+          const looksResponseFormatRelated = `${safe.message} ${safe.code || ""} ${safe.type || ""}`.toLowerCase().includes("response_format");
+          if (!useResponseFormat || !looksResponseFormatRelated) {
+            break;
+          }
+        }
+      }
+    } else {
+      try {
+        openAiDebug.checkpoint = "direct-fetch-minimal-test-starting";
+        console.info("[openai][content-intelligence][checkpoint]", { checkpoint: openAiDebug.checkpoint, model });
+        await directFetchMinimalTest(apiKey, model);
+        openAiDebug.directFetchMinimalTestSucceeded = true;
+        openAiDebug.minimalTestSucceeded = true;
+        openAiDebug.checkpoint = "direct-fetch-minimal-test-completed";
+        console.info("[openai][content-intelligence][direct-fetch-minimal-test-succeeded]", { checkpoint: openAiDebug.checkpoint, model });
+      } catch (error) {
+        const safe = logOpenAiError("[openai][content-intelligence][direct-fetch-minimal-test-failed]", error);
+        errors.push(safe);
+        openAiDebug.openAiStatusCode = safe.status;
+        openAiDebug.openAiErrorType = safe.type;
+        openAiDebug.openAiErrorCode = safe.code;
+        continue;
+      }
+
+      for (const useResponseFormat of [true, false]) {
+        openAiDebug.responseFormatUsed = useResponseFormat;
+
+        try {
+          openAiDebug.checkpoint = "direct-fetch-json-generation-starting";
+          completion = await directFetchChatCompletion(apiKey, baseParams, model, useResponseFormat);
+          openAiDebug.modelUsed = model;
+          openAiDebug.checkpoint = "direct-fetch-json-generation-completed";
+          console.info("[openai][content-intelligence][direct-fetch-generation-succeeded]", {
+            checkpoint: openAiDebug.checkpoint,
+            model,
+            responseFormatUsed: useResponseFormat
+          });
+          break;
+        } catch (error) {
+          const safe = logOpenAiError("[openai][content-intelligence][direct-fetch-generation-failed]", error);
+          errors.push(safe);
+          openAiDebug.openAiStatusCode = safe.status;
+          openAiDebug.openAiErrorType = safe.type;
+          openAiDebug.openAiErrorCode = safe.code;
+
+          const looksResponseFormatRelated = `${safe.message} ${safe.code || ""} ${safe.type || ""}`.toLowerCase().includes("response_format");
+          if (!useResponseFormat || !looksResponseFormatRelated) {
+            break;
+          }
         }
       }
     }

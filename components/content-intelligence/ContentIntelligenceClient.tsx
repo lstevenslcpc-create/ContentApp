@@ -157,6 +157,13 @@ type DiagnosticsState = {
 type ApiDebugState = {
   statusCode?: number;
   rawJson?: unknown;
+  checkpoint?: string;
+  keyExists?: boolean;
+  keyPreview?: string;
+  runtimeType?: string;
+  nodeVersion?: string;
+  openAiClientInitialized?: boolean;
+  directFetchMinimalTestSucceeded?: boolean;
   openAiResponseReceived?: boolean;
   opportunitiesArrayParsed?: boolean;
   opportunityCount?: number;
@@ -252,6 +259,13 @@ export function ContentIntelligenceClient() {
       setApiDebug({
         statusCode: response.status,
         rawJson: data,
+        checkpoint: typeof (data.debug as { checkpoint?: unknown } | undefined)?.checkpoint === "string" ? (data.debug as { checkpoint: string }).checkpoint : undefined,
+        keyExists: Boolean((data.debug as { keyExists?: boolean } | undefined)?.keyExists),
+        keyPreview: typeof (data.debug as { keyPreview?: unknown } | undefined)?.keyPreview === "string" ? (data.debug as { keyPreview: string }).keyPreview : undefined,
+        runtimeType: typeof (data.debug as { runtimeType?: unknown } | undefined)?.runtimeType === "string" ? (data.debug as { runtimeType: string }).runtimeType : undefined,
+        nodeVersion: typeof (data.debug as { nodeVersion?: unknown } | undefined)?.nodeVersion === "string" ? (data.debug as { nodeVersion: string }).nodeVersion : undefined,
+        openAiClientInitialized: Boolean((data.debug as { openAiClientInitialized?: boolean } | undefined)?.openAiClientInitialized),
+        directFetchMinimalTestSucceeded: Boolean((data.debug as { directFetchMinimalTestSucceeded?: boolean } | undefined)?.directFetchMinimalTestSucceeded),
         openAiResponseReceived: Boolean((data.debug as { openAiResponseReceived?: boolean } | undefined)?.openAiResponseReceived),
         opportunitiesArrayParsed: Boolean((data.debug as { opportunitiesArrayParsed?: boolean } | undefined)?.opportunitiesArrayParsed),
         opportunityCount: typeof (data.debug as { opportunityCount?: unknown } | undefined)?.opportunityCount === "number"
@@ -406,6 +420,11 @@ export function ContentIntelligenceClient() {
           <div className="mt-3 rounded-xl border border-[#eadfc8] bg-[#fffdf8] p-3 text-xs leading-5 text-[#77633c]">
             <p className="font-bold text-[#172a3a]">Temporary API debug</p>
             <p>API status code: {apiDebug.statusCode ?? "unknown"}</p>
+            <p>Current checkpoint: {apiDebug.checkpoint || "unknown"}</p>
+            <p>Runtime: {apiDebug.runtimeType || "unknown"} · Node: {apiDebug.nodeVersion || "unknown"}</p>
+            <p>OpenAI key: {apiDebug.keyExists ? "exists" : "missing"} {apiDebug.keyPreview ? `(starts ${apiDebug.keyPreview})` : ""}</p>
+            <p>OpenAI client initialized: {apiDebug.openAiClientInitialized ? "yes" : "no"}</p>
+            <p>Direct fetch minimal test succeeded: {apiDebug.directFetchMinimalTestSucceeded ? "yes" : "no"}</p>
             <p>OpenAI response received: {apiDebug.openAiResponseReceived ? "yes" : "no"}</p>
             <p>Model used: {apiDebug.modelUsed || "unknown"}</p>
             <p>OpenAI status code: {apiDebug.openAiStatusCode ?? "unknown"}</p>
