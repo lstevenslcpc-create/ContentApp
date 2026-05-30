@@ -26,9 +26,15 @@ function clientError(error: unknown, fallback: string) {
   const status = typeof details === "object" && details && "status" in details ? details.status : undefined;
   const code = typeof details === "object" && details && "code" in details ? details.code : undefined;
   return {
+    ok: false,
     error: message || fallback,
     details: process.env.NODE_ENV === "development" ? details : { message: message || fallback, status, code },
-    env: getSupabaseEnvStatus()
+    env: getSupabaseEnvStatus(),
+    debug: {
+      openAiResponseReceived: false,
+      opportunitiesArrayParsed: false,
+      opportunityCount: 0
+    }
   };
 }
 
@@ -194,7 +200,7 @@ export async function GET(request: Request) {
       .limit(24);
 
     if (error) throw error;
-    return NextResponse.json({ opportunities: data || [] });
+    return NextResponse.json({ ok: true, opportunities: data || [] });
   } catch (error) {
     console.error("[content-intelligence][GET]", errorDetails(error));
     const authResponse = authErrorResponse(error);
@@ -222,7 +228,9 @@ export async function POST(request: Request) {
 
     if (!process.env.OPENAI_API_KEY && action === "generate") {
       return NextResponse.json({
+        ok: false,
         error: "OpenAI is not configured in production. Add OPENAI_API_KEY in Netlify environment variables and redeploy.",
+        details: { message: "OpenAI is not configured in production. Add OPENAI_API_KEY in Netlify environment variables and redeploy." },
         env: getSupabaseEnvStatus()
       }, { status: 500 });
     }
@@ -231,7 +239,7 @@ export async function POST(request: Request) {
       const theme = String(body.theme || "").trim();
       if (!theme) {
         console.warn("[content-intelligence][validation-failed]", { reason: "missing theme" });
-        return NextResponse.json({ error: "Enter a theme to generate content opportunities." }, { status: 400 });
+        return NextResponse.json({ ok: false, error: "Enter a theme to generate content opportunities.", details: { message: "Enter a theme to generate content opportunities." } }, { status: 400 });
       }
 
       let brandBrain = null;
@@ -265,22 +273,30 @@ export async function POST(request: Request) {
         console.error("[content-intelligence][openai-generation-failed]", errorDetails(openAiError));
         return NextResponse.json(
           {
+            ok: false,
             error: "Content Intelligence could not generate opportunities.",
             details: {
               message: safeMessage(openAiError)
             },
             warnings,
-            env: getSupabaseEnvStatus()
+            env: getSupabaseEnvStatus(),
+            debug: {
+              openAiResponseReceived: false,
+              opportunitiesArrayParsed: false,
+              opportunityCount: 0
+            }
           },
           { status: 500 }
         );
       }
 
       return NextResponse.json({
+        ok: true,
         opportunities: generated.opportunities,
         disclaimer: "AI-assisted content strategy suggestions. Live search and social trend APIs are not connected yet.",
         warnings: [...warnings, ...generated.warnings].length ? [...warnings, ...generated.warnings] : undefined,
-        env: getSupabaseEnvStatus()
+        env: getSupabaseEnvStatus(),
+        debug: generated.debug
       });
     }
 
@@ -289,7 +305,7 @@ export async function POST(request: Request) {
       const opportunity = body.opportunity as ContentOpportunity | undefined;
       if (!opportunity?.topic) {
         console.warn("[content-intelligence][save-validation-failed]", { reason: "missing opportunity topic" });
-        return NextResponse.json({ error: "A content opportunity is required." }, { status: 400 });
+        return NextResponse.json({ ok: false, error: "A content opportunity is required.", details: { message: "A content opportunity is required." } }, { status: 400 });
       }
 
       const { data, error } = await supabase
@@ -310,6 +326,7 @@ export async function POST(request: Request) {
           console.error("[content-intelligence][save-legacy-row-failed]", errorDetails(legacyError));
           return NextResponse.json(
             {
+              ok: false,
               opportunity,
               warning: "Supabase could not save this idea, but the generated opportunity is still available on the page.",
               error: legacyError.message || error.message || "Unable to save idea.",
@@ -321,14 +338,15 @@ export async function POST(request: Request) {
         }
 
         return NextResponse.json({
+          ok: true,
           opportunity: legacyData,
           warning: "Saved with legacy content_opportunities columns. Run the latest Supabase SQL migration to store the upgraded Content Intelligence fields."
         });
       }
-      return NextResponse.json({ opportunity: data });
+      return NextResponse.json({ ok: true, opportunity: data });
     }
 
-    return NextResponse.json({ error: "Unsupported content intelligence action." }, { status: 400 });
+    return NextResponse.json({ ok: false, error: "Unsupported content intelligence action.", details: { message: "Unsupported content intelligence action." } }, { status: 400 });
   } catch (error) {
     console.error("[content-intelligence][POST]", errorDetails(error));
     const authResponse = authErrorResponse(error);

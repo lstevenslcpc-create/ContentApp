@@ -154,6 +154,14 @@ type DiagnosticsState = {
   brandBrainsSchemaFieldsExist?: boolean;
 };
 
+type ApiDebugState = {
+  statusCode?: number;
+  rawJson?: unknown;
+  openAiResponseReceived?: boolean;
+  opportunitiesArrayParsed?: boolean;
+  opportunityCount?: number;
+};
+
 async function readApiResponse(response: Response) {
   const text = await response.text();
   if (!text) return {};
@@ -203,6 +211,7 @@ export function ContentIntelligenceClient() {
   const [loading, setLoading] = useState(false);
   const [busyTopic, setBusyTopic] = useState("");
   const [diagnostics, setDiagnostics] = useState<DiagnosticsState | null>(null);
+  const [apiDebug, setApiDebug] = useState<ApiDebugState | null>(null);
 
   async function refreshDiagnostics() {
     try {
@@ -235,11 +244,23 @@ export function ContentIntelligenceClient() {
         body: JSON.stringify({ action: "generate", theme })
       });
       const data = await readApiResponse(response);
+      setApiDebug({
+        statusCode: response.status,
+        rawJson: data,
+        openAiResponseReceived: Boolean((data.debug as { openAiResponseReceived?: boolean } | undefined)?.openAiResponseReceived),
+        opportunitiesArrayParsed: Boolean((data.debug as { opportunitiesArrayParsed?: boolean } | undefined)?.opportunitiesArrayParsed),
+        opportunityCount: typeof (data.debug as { opportunityCount?: unknown } | undefined)?.opportunityCount === "number"
+          ? (data.debug as { opportunityCount: number }).opportunityCount
+          : Array.isArray(data.opportunities) ? data.opportunities.length : 0
+      });
       setLoading(false);
       if (!response.ok) {
         const latestDiagnostics = await refreshDiagnostics();
         const reason = diagnosticsFailureReason(latestDiagnostics);
-        setMessage([formatApiError(data, "Unable to generate content opportunities."), reason].filter(Boolean).join(" "));
+        const backendMessage = data.details && typeof data.details === "object" && "message" in data.details
+          ? String((data.details as { message?: unknown }).message || "")
+          : "";
+        setMessage([backendMessage || formatApiError(data, "Unable to generate content opportunities."), reason].filter(Boolean).join(" "));
         return;
       }
       setOpportunities(Array.isArray(data.opportunities) ? data.opportunities as ContentOpportunity[] : []);
@@ -370,6 +391,18 @@ export function ContentIntelligenceClient() {
           <p className="mt-3 rounded-xl bg-[#fffdf8] p-3 text-xs font-semibold leading-5 text-[#77633c]">
             Session diagnostics: token sent {diagnostics.authHeaderReceived || diagnostics.authCookieReceived ? "yes" : "no"} · user detected {diagnostics.userDetected ? "yes" : "no"} · OpenAI {diagnostics.OPENAI_API_KEY ? "ready" : "missing"} · Supabase {diagnostics.SUPABASE_URL && diagnostics.SUPABASE_SERVICE_ROLE_KEY ? "ready" : "missing"} · Content schema {diagnostics.contentOpportunitiesSchemaFieldsExist ? "ready" : "missing"} · Brand Brain schema {diagnostics.brandBrainsSchemaFieldsExist ? "ready" : "missing"}
           </p>
+        )}
+        {apiDebug && (
+          <div className="mt-3 rounded-xl border border-[#eadfc8] bg-[#fffdf8] p-3 text-xs leading-5 text-[#77633c]">
+            <p className="font-bold text-[#172a3a]">Temporary API debug</p>
+            <p>API status code: {apiDebug.statusCode ?? "unknown"}</p>
+            <p>OpenAI response received: {apiDebug.openAiResponseReceived ? "yes" : "no"}</p>
+            <p>Opportunities array parsed: {apiDebug.opportunitiesArrayParsed ? "yes" : "no"}</p>
+            <p>Opportunity count: {apiDebug.opportunityCount ?? 0}</p>
+            <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-lg bg-[#172a3a] p-3 text-[11px] leading-5 text-[#f3ecdf]">
+              {JSON.stringify(apiDebug.rawJson, null, 2)}
+            </pre>
+          </div>
         )}
       </section>
 

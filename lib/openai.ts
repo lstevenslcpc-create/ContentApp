@@ -14,6 +14,12 @@ type GeneratedPost = {
 type ParsedContentOpportunities = {
   opportunities: ContentOpportunity[];
   warnings: string[];
+  debug: {
+    openAiResponseReceived: boolean;
+    rawResponsePreview: string;
+    opportunitiesArrayParsed: boolean;
+    opportunityCount: number;
+  };
 };
 
 function extractJsonObject(raw: string) {
@@ -342,6 +348,7 @@ Make the ideas specific to therapy, clinical safety, LionHeart Therapy, products
     finishReason: completion.choices[0]?.finish_reason,
     contentLength: raw.length
   });
+  console.info("[openai][content-intelligence][raw-response]", raw.slice(0, 4000));
 
   let parsed: { opportunities?: Partial<ContentOpportunity>[] } | Partial<ContentOpportunity>[];
   const warnings: string[] = [];
@@ -356,7 +363,13 @@ Make the ideas specific to therapy, clinical safety, LionHeart Therapy, products
 
     return {
       opportunities: fallbackContentOpportunities(theme),
-      warnings: [`OpenAI returned malformed JSON, so a safe fallback idea was generated instead. Parser detail: ${safeErrorMessage(error)}`]
+      warnings: [`OpenAI returned malformed JSON, so a safe fallback idea was generated instead. Parser detail: ${safeErrorMessage(error)}`],
+      debug: {
+        openAiResponseReceived: true,
+        rawResponsePreview: raw.slice(0, 1200),
+        opportunitiesArrayParsed: false,
+        opportunityCount: 1
+      }
     };
   }
 
@@ -370,7 +383,13 @@ Make the ideas specific to therapy, clinical safety, LionHeart Therapy, products
 
     return {
       opportunities: fallbackContentOpportunities(theme),
-      warnings: ["OpenAI response did not include an opportunities array, so a safe fallback idea was generated instead."]
+      warnings: ["OpenAI response did not include an opportunities array, so a safe fallback idea was generated instead."],
+      debug: {
+        openAiResponseReceived: true,
+        rawResponsePreview: raw.slice(0, 1200),
+        opportunitiesArrayParsed: false,
+        opportunityCount: 1
+      }
     };
   }
 
@@ -390,8 +409,32 @@ Make the ideas specific to therapy, clinical safety, LionHeart Therapy, products
 
   if (!normalized.length) {
     warnings.push("All OpenAI opportunities were malformed, so a safe fallback idea was generated instead.");
-    return { opportunities: fallbackContentOpportunities(theme), warnings };
+    return {
+      opportunities: fallbackContentOpportunities(theme),
+      warnings,
+      debug: {
+        openAiResponseReceived: true,
+        rawResponsePreview: raw.slice(0, 1200),
+        opportunitiesArrayParsed: true,
+        opportunityCount: 1
+      }
+    };
   }
 
-  return { opportunities: normalized, warnings };
+  console.info("[openai][content-intelligence][parsed]", {
+    opportunitiesArrayParsed: true,
+    opportunityCount: normalized.length,
+    skippedCount: warnings.length
+  });
+
+  return {
+    opportunities: normalized,
+    warnings,
+    debug: {
+      openAiResponseReceived: true,
+      rawResponsePreview: raw.slice(0, 1200),
+      opportunitiesArrayParsed: true,
+      opportunityCount: normalized.length
+    }
+  };
 }
