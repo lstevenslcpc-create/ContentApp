@@ -189,6 +189,41 @@ export type ContentOpportunity = {
   updated_at?: string;
 };
 
+export type ContentPackSectionKey =
+  | "tiktok_reels_script"
+  | "instagram_carousel_outline"
+  | "slide_by_slide_carousel_copy"
+  | "instagram_caption"
+  | "pinterest_pin_title"
+  | "pinterest_description"
+  | "threads_post"
+  | "blog_outline"
+  | "email_newsletter_blurb"
+  | "canva_visual_direction"
+  | "product_cta"
+  | "therapy_service_cta"
+  | "safety_disclaimer";
+
+export type ContentPackBody = Record<ContentPackSectionKey, string>;
+
+export type ContentPack = {
+  id: string;
+  user_id?: string | null;
+  opportunity_id?: string | null;
+  title: string;
+  status: ContentStatus;
+  source_topic?: string | null;
+  audience?: string | null;
+  content_pillar?: string | null;
+  product_tie_in?: string | null;
+  service_tie_in?: string | null;
+  clinical_sensitivity?: "low" | "medium" | "high" | string | null;
+  pack: ContentPackBody;
+  metadata?: Record<string, unknown>;
+  created_at?: string;
+  updated_at?: string;
+};
+
 export type MediaLibraryStatus = "draft" | "saved" | "approved" | "used" | "archived";
 
 export type MediaLibraryAsset = {

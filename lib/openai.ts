@@ -1,5 +1,5 @@
 import type OpenAI from "openai";
-import type { BrandBrain, BusinessProfile, ContentGenerationRequest, ContentOpportunity } from "./types";
+import type { BrandBrain, BusinessProfile, ContentGenerationRequest, ContentOpportunity, ContentPackBody } from "./types";
 import { buildContentPrompt } from "./contentPrompt";
 import { formatBrandBrainForPrompt } from "./brandBrain/format";
 
@@ -32,6 +32,16 @@ type ParsedContentOpportunities = {
     openAiErrorCode?: string;
     minimalTestSucceeded?: boolean;
     responseFormatUsed?: boolean;
+  };
+};
+
+type ParsedContentPack = {
+  pack: ContentPackBody;
+  warnings: string[];
+  debug: {
+    openAiResponseReceived: boolean;
+    rawResponsePreview: string;
+    modelUsed?: string;
   };
 };
 
@@ -345,6 +355,57 @@ function normalizeOpportunity(opportunity: Partial<ContentOpportunity>, theme: s
   };
 }
 
+const contentPackKeys = [
+  "tiktok_reels_script",
+  "instagram_carousel_outline",
+  "slide_by_slide_carousel_copy",
+  "instagram_caption",
+  "pinterest_pin_title",
+  "pinterest_description",
+  "threads_post",
+  "blog_outline",
+  "email_newsletter_blurb",
+  "canva_visual_direction",
+  "product_cta",
+  "therapy_service_cta",
+  "safety_disclaimer"
+] as const;
+
+function fallbackContentPack(opportunity: ContentOpportunity): ContentPackBody {
+  const topic = opportunity.topic || "this therapy topic";
+  const hook = opportunity.strongest_emotional_hook || `The part of ${topic} people do not always say out loud`;
+  const visual = opportunity.visual_direction || "Soft cream background, muted navy type, sage accents, and a therapist-authored notebook-style layout.";
+  return {
+    tiktok_reels_script: `${hook}\n\nName one hidden pattern, give one grounded reframe, and close with: ${opportunity.cta || "Save this for later and reach out when you are ready for support."}`,
+    instagram_carousel_outline: `Carousel about ${topic}: hook, hidden signs, what it feels like internally, why it makes sense, one grounded next step, CTA.`,
+    slide_by_slide_carousel_copy: `Slide 1: ${hook}\nSlide 2: What people see\nSlide 3: What may be happening internally\nSlide 4: A clinically grounded reframe\nSlide 5: One small next step\nSlide 6: ${opportunity.cta || "Save this for later."}`,
+    instagram_caption: `${hook}\n\n${opportunity.emotional_angle || "There is often more happening underneath the surface than people realize."}\n\n${opportunity.cta || "Save this for later and reach out when you are ready for support."}`,
+    pinterest_pin_title: `${topic}: signs, patterns, and support`,
+    pinterest_description: `A therapist-informed guide to ${topic}, including hidden patterns, emotional signs, and supportive next steps from LionHeart Therapy.`,
+    threads_post: `${hook} Sometimes the pattern is not dramatic. It is quiet, repetitive, and exhausting. That still deserves care.`,
+    blog_outline: `H1: ${topic}\nIntro: name the emotional pain\nSection 1: hidden signs\nSection 2: why this pattern can develop\nSection 3: what helps\nSection 4: when therapy support may help\nCTA: ${opportunity.cta || "Contact LionHeart Therapy."}`,
+    email_newsletter_blurb: `A short therapist-authored note about ${topic}, naming the emotional pattern with compassion and offering one grounded reflection for the week.`,
+    canva_visual_direction: visual,
+    product_cta: opportunity.product_tie_in ? `If ${opportunity.product_tie_in} fits your season, use it as a gentle next step for reflection and structure.` : "Save this resource and revisit it when you want a more structured reflection prompt.",
+    therapy_service_cta: opportunity.service_tie_in ? `If this pattern is affecting your daily life or relationships, ${opportunity.service_tie_in} can offer more personalized support.` : "Therapy can help you understand the pattern underneath the reaction and build steadier ways to respond.",
+    safety_disclaimer: opportunity.clinical_sensitivity === "high" ? "Educational content only. This is not therapy or diagnosis. If you are in crisis or immediate danger, contact local emergency services or a crisis hotline." : "Educational content only. This is not therapy advice, diagnosis, or a substitute for care from a licensed professional."
+  };
+}
+
+function normalizeContentPack(value: unknown, opportunity: ContentOpportunity) {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  const fallback = fallbackContentPack(opportunity);
+  const warnings: string[] = [];
+  const pack = contentPackKeys.reduce((accumulator, key) => {
+    const raw = source[key];
+    const text = typeof raw === "string" ? raw.trim() : Array.isArray(raw) ? raw.map(String).join("\n").trim() : "";
+    if (!text) warnings.push(`Missing ${key}; used a safe fallback.`);
+    return { ...accumulator, [key]: text || fallback[key] };
+  }, {} as ContentPackBody);
+
+  return { pack, warnings };
+}
+
 export async function generateStructuredContent(profile: BusinessProfile, request: ContentGenerationRequest, brandBrain?: BrandBrain | null): Promise<GeneratedPost[]> {
   if (!process.env.OPENAI_API_KEY) {
     throw new Error("OPENAI_API_KEY is missing. Add it to generate content.");
@@ -378,6 +439,105 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
     visual_idea: String(post.visual_idea || "").trim(),
     script: String(post.script || "").trim()
   }));
+}
+
+export async function generateContentPack(opportunity: ContentOpportunity, brandBrain?: BrandBrain | null, sectionFocus?: string): Promise<ParsedContentPack> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY is missing. Add it to generate content packs.");
+  }
+
+  const client = await createOpenAiClient(apiKey);
+  const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
+  const focusInstruction = sectionFocus
+    ? `Regenerate with special attention to this section: ${sectionFocus}. Still return the full JSON object.`
+    : "Generate the full content pack.";
+
+  const completion = await withTimeout(
+    client.chat.completions.create({
+      model,
+      temperature: 0.78,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content: "Return only valid JSON. You are LionHeart Therapy's therapist-creator content pack strategist. Keep the voice emotionally specific, clinically grounded, modern, and human."
+        },
+        {
+          role: "user",
+          content: `
+Create a complete multi-platform content pack from this saved Content Intelligence idea.
+
+${focusInstruction}
+
+Brand Brain:
+${formatBrandBrainForPrompt(brandBrain)}
+
+Content opportunity:
+${JSON.stringify(opportunity, null, 2)}
+
+Rules:
+- Make the content sound like a real therapist creator, not generic AI.
+- Use emotional specificity: inner dialogue, hidden behaviors, attachment patterns, nervous system responses, avoidance, perfectionism, conflict anxiety, and relational tension when relevant.
+- Avoid fake inspirational language and banned wellness phrases.
+- Do not overpromise, diagnose, or imply guaranteed outcomes.
+- If clinical sensitivity is medium or high, include a clear safety disclaimer.
+- Make Canva directions specific enough for a designer or Canva template workflow.
+- Product and therapy CTAs should be soft, ethical, and conversion-aware.
+- Keep each section ready to copy into its platform.
+
+Return strict JSON only with this exact shape:
+{
+  "tiktok_reels_script": "Hook, scene/beat outline, spoken script, caption note, and CTA",
+  "instagram_carousel_outline": "High-level carousel structure",
+  "slide_by_slide_carousel_copy": "Slide 1 through final slide copy",
+  "instagram_caption": "Full caption with CTA",
+  "pinterest_pin_title": "Searchable title",
+  "pinterest_description": "Pinterest description with keywords",
+  "threads_post": "Threads-ready post",
+  "blog_outline": "SEO blog outline with H1/H2s and talking points",
+  "email_newsletter_blurb": "Short newsletter section",
+  "canva_visual_direction": "Canva-ready visual direction",
+  "product_cta": "Product CTA or empty string if no product tie-in",
+  "therapy_service_cta": "Therapy service CTA or empty string if no service tie-in",
+  "safety_disclaimer": "Required disclaimer if needed, otherwise a short educational-only note"
+}
+`
+        }
+      ]
+    }),
+    45000,
+    `OpenAI content pack generation for ${model}`
+  );
+
+  const raw = completion.choices[0]?.message?.content;
+  if (!raw) throw new Error("OpenAI returned an empty content pack response.");
+
+  let parsed: unknown;
+  try {
+    parsed = extractJsonObject(raw);
+  } catch (error) {
+    return {
+      pack: fallbackContentPack(opportunity),
+      warnings: [`OpenAI returned malformed JSON, so a safe fallback pack was generated. Parser detail: ${safeErrorMessage(error)}`],
+      debug: {
+        openAiResponseReceived: true,
+        rawResponsePreview: raw.slice(0, 1200),
+        modelUsed: model
+      }
+    };
+  }
+
+  const normalized = normalizeContentPack(parsed, opportunity);
+  return {
+    pack: normalized.pack,
+    warnings: normalized.warnings,
+    debug: {
+      openAiResponseReceived: true,
+      rawResponsePreview: raw.slice(0, 1200),
+      modelUsed: model
+    }
+  };
 }
 
 export async function generateContentOpportunities(theme: string, brandBrain?: BrandBrain | null): Promise<ParsedContentOpportunities> {

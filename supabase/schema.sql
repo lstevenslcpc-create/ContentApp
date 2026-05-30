@@ -133,6 +133,26 @@ create table if not exists media_library (
   constraint media_library_status_check check (status in ('draft', 'saved', 'approved', 'used', 'archived'))
 );
 
+create table if not exists content_packs (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  opportunity_id uuid references content_opportunities(id) on delete set null,
+  title text not null,
+  status text default 'draft',
+  source_topic text,
+  audience text,
+  content_pillar text,
+  product_tie_in text,
+  service_tie_in text,
+  clinical_sensitivity text,
+  pack jsonb default '{}'::jsonb,
+  metadata jsonb default '{}'::jsonb,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  constraint content_packs_status_check check (status in ('draft', 'needs_review', 'approved', 'scheduled', 'posted', 'failed')),
+  constraint content_packs_clinical_sensitivity_check check (clinical_sensitivity is null or clinical_sensitivity in ('low', 'medium', 'high'))
+);
+
 create table if not exists social_accounts (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete cascade,
@@ -240,6 +260,18 @@ alter table media_library add column if not exists prompt text;
 alter table media_library add column if not exists tags text[] default '{}';
 alter table media_library add column if not exists status text default 'saved';
 alter table media_library add column if not exists metadata jsonb default '{}'::jsonb;
+alter table content_packs add column if not exists user_id uuid references auth.users(id) on delete cascade;
+alter table content_packs add column if not exists opportunity_id uuid references content_opportunities(id) on delete set null;
+alter table content_packs add column if not exists title text;
+alter table content_packs add column if not exists status text default 'draft';
+alter table content_packs add column if not exists source_topic text;
+alter table content_packs add column if not exists audience text;
+alter table content_packs add column if not exists content_pillar text;
+alter table content_packs add column if not exists product_tie_in text;
+alter table content_packs add column if not exists service_tie_in text;
+alter table content_packs add column if not exists clinical_sensitivity text;
+alter table content_packs add column if not exists pack jsonb default '{}'::jsonb;
+alter table content_packs add column if not exists metadata jsonb default '{}'::jsonb;
 alter table social_accounts add column if not exists user_id uuid references auth.users(id) on delete cascade;
 alter table analytics_events add column if not exists user_id uuid references auth.users(id) on delete cascade;
 
@@ -276,6 +308,11 @@ create trigger media_library_updated_at
 before update on media_library
 for each row execute procedure set_updated_at();
 
+drop trigger if exists content_packs_updated_at on content_packs;
+create trigger content_packs_updated_at
+before update on content_packs
+for each row execute procedure set_updated_at();
+
 drop trigger if exists integration_connections_updated_at on integration_connections;
 create trigger integration_connections_updated_at
 before update on integration_connections
@@ -286,6 +323,7 @@ alter table brand_brains enable row level security;
 alter table generated_content enable row level security;
 alter table content_opportunities enable row level security;
 alter table media_library enable row level security;
+alter table content_packs enable row level security;
 alter table social_accounts enable row level security;
 alter table analytics_events enable row level security;
 alter table integration_connections enable row level security;
@@ -317,6 +355,12 @@ with check (auth.uid() = user_id);
 drop policy if exists "Users can manage their media library" on media_library;
 create policy "Users can manage their media library"
 on media_library for all
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+drop policy if exists "Users can manage their content packs" on content_packs;
+create policy "Users can manage their content packs"
+on content_packs for all
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
 

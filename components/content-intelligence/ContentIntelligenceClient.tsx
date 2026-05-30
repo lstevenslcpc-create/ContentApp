@@ -2,6 +2,7 @@
 
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowRight, BookmarkPlus, Brain, Lightbulb, Loader2, Mail, Newspaper, Pin, Search, Sparkles, Video } from "lucide-react";
 import { authedFetch } from "@/lib/apiClient";
 import type { ContentOpportunity, PlatformAngles } from "@/lib/types";
@@ -216,9 +217,11 @@ function diagnosticsFailureReason(diagnostics: DiagnosticsState | null) {
 }
 
 export function ContentIntelligenceClient() {
+  const router = useRouter();
   const [theme, setTheme] = useState("teen anxiety");
   const [opportunities, setOpportunities] = useState<ContentOpportunity[]>(starterOpportunities);
   const [saved, setSaved] = useState<Record<string, boolean>>({});
+  const [savedOpportunities, setSavedOpportunities] = useState<Record<string, ContentOpportunity>>({});
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [busyTopic, setBusyTopic] = useState("");
@@ -297,7 +300,7 @@ export function ContentIntelligenceClient() {
     }
   }
 
-  async function saveIdea(opportunity: ContentOpportunity) {
+  async function saveIdea(opportunity: ContentOpportunity): Promise<ContentOpportunity | null> {
     setBusyTopic(opportunity.topic);
     setMessage("");
     try {
@@ -310,56 +313,59 @@ export function ContentIntelligenceClient() {
       setBusyTopic("");
       if (!response.ok) {
         setMessage(formatApiError(data, "Unable to save idea."));
-        return;
+        return null;
       }
+      const savedOpportunity = data.opportunity && typeof data.opportunity === "object" ? data.opportunity as ContentOpportunity : opportunity;
       setSaved((current) => ({ ...current, [opportunity.topic]: true }));
+      setSavedOpportunities((current) => ({ ...current, [opportunity.topic]: savedOpportunity }));
       setMessage(typeof data.warning === "string" ? data.warning : "Idea saved as a draft content opportunity.");
+      return savedOpportunity;
     } catch (error) {
       setBusyTopic("");
       setMessage(error instanceof Error ? error.message : "Network error while saving idea.");
+      return null;
     }
   }
 
   async function generatePack(opportunity: ContentOpportunity) {
     setBusyTopic(opportunity.topic);
     setMessage("");
-    const platform = pickPrimaryPlatform(opportunity);
     try {
-      const response = await authedFetch("/api/content/generate", {
+      let selectedOpportunity: ContentOpportunity | null = savedOpportunities[opportunity.topic] || (opportunity.id ? opportunity : null);
+      if (!selectedOpportunity) {
+        selectedOpportunity = await saveIdea(opportunity);
+      }
+
+      if (!selectedOpportunity) {
+        setBusyTopic("");
+        return;
+      }
+
+      setMessage("Creating a complete multi-platform content pack...");
+      setBusyTopic(opportunity.topic);
+      const response = await authedFetch("/api/content-packs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          platform,
-          contentType: platform === "Pinterest" ? "post" : "carousel",
-          contentGoal: opportunity.content_pillar || "education",
-          numberOfPosts: 7,
-          intelligenceBrief: {
-            topic: opportunity.topic,
-            audience: opportunity.audience,
-            content_pillar: opportunity.content_pillar,
-            seo_keywords: opportunity.seo_keywords,
-            emotional_angle: opportunity.emotional_angle,
-            strongest_emotional_hook: opportunity.strongest_emotional_hook,
-            curiosity_angle: opportunity.curiosity_angle,
-            save_worthy_angle: opportunity.save_worthy_angle,
-            share_worthy_angle: opportunity.share_worthy_angle,
-            emotional_trigger_category: opportunity.emotional_trigger_category,
-            visual_direction: opportunity.visual_direction,
-            product_tie_in: opportunity.product_tie_in,
-            service_tie_in: opportunity.service_tie_in,
-            cta: opportunity.cta,
-            clinical_sensitivity: opportunity.clinical_sensitivity
-          }
+          opportunityId: selectedOpportunity.id,
+          opportunity: selectedOpportunity
         })
       });
       const data = await readApiResponse(response);
       setBusyTopic("");
       if (!response.ok) {
-        setMessage(formatApiError(data, "Unable to generate content pack. Make sure your Business Profile, Brand Brain, OpenAI key, and Supabase session are configured."));
+        setMessage(formatApiError(data, "Unable to create content pack. Make sure Brand Brain, OpenAI, Supabase, and the content_packs table are configured."));
         return;
       }
-      const posts = Array.isArray(data.posts) ? data.posts : [];
-      setMessage(`Generated ${posts.length} content drafts from "${opportunity.topic}". Open Content Generator or Calendar to review them.`);
+      const pack = data.pack && typeof data.pack === "object" ? data.pack as { id?: string } : {};
+      if (pack.id) {
+        if (String(pack.id).startsWith("temporary-")) {
+          window.sessionStorage.setItem(`content-pack:${pack.id}`, JSON.stringify(pack));
+        }
+        router.push(`/content-packs/${pack.id}`);
+        return;
+      }
+      setMessage("Content pack created, but the preview link was missing from the response.");
     } catch (error) {
       setBusyTopic("");
       setMessage(error instanceof Error ? error.message : "Network error while generating content pack.");
@@ -454,7 +460,7 @@ export function ContentIntelligenceClient() {
               opportunity={opportunity}
               saved={Boolean(saved[opportunity.topic])}
               busy={busyTopic === opportunity.topic}
-              onSave={() => saveIdea(opportunity)}
+              onSave={() => void saveIdea(opportunity)}
               onGenerate={() => generatePack(opportunity)}
             />
           ))}
@@ -559,7 +565,7 @@ function OpportunityCard({ opportunity, saved, busy, onSave, onGenerate }: { opp
             />
             <button className="btn-primary bg-[#172a3a] hover:bg-[#22384a]" onClick={onGenerate} disabled={busy}>
               {busy ? <Loader2 className="animate-spin" size={16} /> : <ArrowRight size={16} />}
-              Generate Content Pack
+              Create Content Pack
             </button>
           </div>
         </div>
@@ -638,12 +644,4 @@ function Sensitivity({ level }: { level: ContentOpportunity["clinical_sensitivit
   };
 
   return <span className={`rounded-full px-3 py-1 text-xs font-bold ${styles[level]}`}>Clinical sensitivity: {level}</span>;
-}
-
-function pickPrimaryPlatform(opportunity: ContentOpportunity) {
-  const text = JSON.stringify(opportunity.platform_recommendations).toLowerCase();
-  if (text.includes("pinterest")) return "Pinterest";
-  if (text.includes("blog")) return "LinkedIn";
-  if (text.includes("tiktok")) return "TikTok";
-  return "Instagram";
 }
