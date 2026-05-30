@@ -6,7 +6,7 @@ import { BarChart3, Brain, CalendarDays, Clapperboard, Compass, FolderOpen, Home
 import { AccountBadge } from "./AccountBadge";
 
 const nav = [
-  { href: "/", label: "Dashboard", icon: Home },
+  { href: "/dashboard", label: "Dashboard", icon: Home },
   { href: "/brand-brain", label: "Brand Brain", icon: Brain },
   { href: "/content-intelligence", label: "Content Intelligence", icon: Compass },
   { href: "/business-profile", label: "Business Profile", icon: UserRound },

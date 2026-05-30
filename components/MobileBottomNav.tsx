@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { Brain, Compass, FolderOpen, Home, Image, Sparkles } from "lucide-react";
 
 const nav = [
-  { href: "/", label: "Home", icon: Home },
+  { href: "/dashboard", label: "Home", icon: Home },
   { href: "/brand-brain", label: "Brain", icon: Brain },
   { href: "/content-intelligence", label: "Ideas", icon: Compass },
   { href: "/content-generator", label: "Create", icon: Sparkles },
