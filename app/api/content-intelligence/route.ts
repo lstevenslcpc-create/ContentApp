@@ -4,6 +4,8 @@ import { generateContentOpportunities } from "@/lib/openai";
 import { getSupabaseAdmin, getSupabaseEnvStatus } from "@/lib/supabaseAdmin";
 import type { ContentOpportunity } from "@/lib/types";
 
+export const runtime = "nodejs";
+
 function errorDetails(error: unknown) {
   if (error instanceof Error) {
     return {
@@ -47,6 +49,22 @@ function safeMessage(error: unknown) {
 function fallbackString(error: unknown) {
   if (typeof error === "string") return error;
   return "Unknown error";
+}
+
+function openAiDebugFromError(error: unknown) {
+  if (typeof error === "object" && error !== null && "openAiDebug" in error) {
+    return (error as { openAiDebug?: Record<string, unknown> }).openAiDebug;
+  }
+
+  return null;
+}
+
+function openAiErrorsFromError(error: unknown) {
+  if (typeof error === "object" && error !== null && "openAiErrors" in error) {
+    return (error as { openAiErrors?: unknown }).openAiErrors;
+  }
+
+  return null;
 }
 
 function envWarnings() {
@@ -276,14 +294,16 @@ export async function POST(request: Request) {
             ok: false,
             error: "Content Intelligence could not generate opportunities.",
             details: {
-              message: safeMessage(openAiError)
+              message: safeMessage(openAiError),
+              openAiErrors: openAiErrorsFromError(openAiError)
             },
             warnings,
             env: getSupabaseEnvStatus(),
             debug: {
               openAiResponseReceived: false,
               opportunitiesArrayParsed: false,
-              opportunityCount: 0
+              opportunityCount: 0,
+              ...openAiDebugFromError(openAiError)
             }
           },
           { status: 500 }

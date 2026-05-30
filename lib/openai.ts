@@ -19,7 +19,42 @@ type ParsedContentOpportunities = {
     rawResponsePreview: string;
     opportunitiesArrayParsed: boolean;
     opportunityCount: number;
+    modelUsed?: string;
+    openAiStatusCode?: number | string;
+    openAiErrorType?: string;
+    openAiErrorCode?: string;
+    minimalTestSucceeded?: boolean;
+    responseFormatUsed?: boolean;
   };
+};
+
+type SafeOpenAiError = {
+  message: string;
+  name?: string;
+  status?: number | string;
+  code?: string;
+  type?: string;
+  stackPreview?: string;
+};
+
+type ChatCompletionParams = Parameters<OpenAI["chat"]["completions"]["create"]>[0];
+
+type OpenAiGenerationDebug = {
+  modelUsed?: string;
+  openAiStatusCode?: number | string;
+  openAiErrorType?: string;
+  openAiErrorCode?: string;
+  minimalTestSucceeded: boolean;
+  responseFormatUsed?: boolean;
+};
+
+type NonStreamingCompletion = {
+  choices: Array<{
+    finish_reason?: string | null;
+    message?: {
+      content?: string | null;
+    } | null;
+  }>;
 };
 
 function extractJsonObject(raw: string) {
@@ -46,6 +81,76 @@ function safeErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message;
   if (typeof error === "object" && error !== null && "message" in error) return String((error as { message?: unknown }).message || "Unknown error");
   return String(error || "Unknown error");
+}
+
+function safeOpenAiError(error: unknown): SafeOpenAiError {
+  const maybe = typeof error === "object" && error !== null ? error as Record<string, unknown> : {};
+  const message = error instanceof Error ? error.message : String(maybe.message || error || "Unknown OpenAI error");
+  const stack = error instanceof Error ? error.stack : undefined;
+  return {
+    message,
+    name: error instanceof Error ? error.name : typeof maybe.name === "string" ? maybe.name : undefined,
+    status: typeof maybe.status === "number" || typeof maybe.status === "string" ? maybe.status : undefined,
+    code: typeof maybe.code === "string" ? maybe.code : undefined,
+    type: typeof maybe.type === "string" ? maybe.type : undefined,
+    stackPreview: stack?.slice(0, 900)
+  };
+}
+
+function logOpenAiError(label: string, error: unknown) {
+  const safe = safeOpenAiError(error);
+  console.error(label, safe);
+  return safe;
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeout = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms.`)), timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
+function modelCandidates() {
+  return Array.from(new Set([
+    process.env.OPENAI_MODEL,
+    "gpt-4o-mini",
+    "gpt-4o"
+  ].filter(Boolean) as string[]));
+}
+
+async function minimalOpenAiTest(client: OpenAI, model: string) {
+  return withTimeout(
+    client.chat.completions.create({
+      model,
+      max_tokens: 24,
+      temperature: 0,
+      messages: [
+        { role: "user", content: "Reply with one short sentence confirming the connection works." }
+      ]
+    }),
+    15000,
+    `OpenAI minimal test for ${model}`
+  );
+}
+
+async function createJsonCompletion(client: OpenAI, params: ChatCompletionParams, model: string, useResponseFormat: boolean) {
+  const request = {
+    ...params,
+    model,
+    ...(useResponseFormat ? { response_format: { type: "json_object" as const } } : {})
+  };
+
+  return withTimeout(
+    client.chat.completions.create(request),
+    45000,
+    `OpenAI JSON generation for ${model}`
+  );
 }
 
 function asNumber(value: unknown, fallback = 72) {
@@ -203,13 +308,14 @@ export async function generateContentOpportunities(theme: string, brandBrain?: B
   }
 
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  let completion;
+  let completion: NonStreamingCompletion | null = null;
+  const openAiDebug: OpenAiGenerationDebug = {
+    minimalTestSucceeded: false
+  };
 
-  try {
-    completion = await client.chat.completions.create({
-      model: "gpt-4o-mini",
+  const baseParams: ChatCompletionParams = {
+    model: "gpt-4o-mini",
       temperature: 0.82,
-      response_format: { type: "json_object" },
       messages: [
         {
           role: "system",
@@ -332,17 +438,74 @@ Make the ideas specific to therapy, clinical safety, LionHeart Therapy, products
 `
         }
       ]
-    });
-  } catch (error) {
-    console.error("[openai][content-intelligence][request-failed]", {
-      message: safeErrorMessage(error),
-      name: error instanceof Error ? error.name : undefined
-    });
-    throw new Error(`OpenAI request failed: ${safeErrorMessage(error)}`);
+  };
+
+  const errors: SafeOpenAiError[] = [];
+
+  for (const model of modelCandidates()) {
+    openAiDebug.modelUsed = model;
+
+    try {
+      const minimal = await minimalOpenAiTest(client, model);
+      openAiDebug.minimalTestSucceeded = true;
+      console.info("[openai][content-intelligence][minimal-test-succeeded]", {
+        model,
+        responseLength: minimal.choices[0]?.message?.content?.length || 0
+      });
+    } catch (error) {
+      const safe = logOpenAiError("[openai][content-intelligence][minimal-test-failed]", error);
+      errors.push(safe);
+      openAiDebug.openAiStatusCode = safe.status;
+      openAiDebug.openAiErrorType = safe.type;
+      openAiDebug.openAiErrorCode = safe.code;
+      continue;
+    }
+
+    for (const useResponseFormat of [true, false]) {
+      openAiDebug.responseFormatUsed = useResponseFormat;
+
+      try {
+        completion = await createJsonCompletion(client, baseParams, model, useResponseFormat) as NonStreamingCompletion;
+        openAiDebug.modelUsed = model;
+        console.info("[openai][content-intelligence][generation-request-succeeded]", {
+          model,
+          responseFormatUsed: useResponseFormat
+        });
+        break;
+      } catch (error) {
+        const safe = logOpenAiError("[openai][content-intelligence][generation-request-failed]", error);
+        errors.push(safe);
+        openAiDebug.openAiStatusCode = safe.status;
+        openAiDebug.openAiErrorType = safe.type;
+        openAiDebug.openAiErrorCode = safe.code;
+
+        const looksResponseFormatRelated = `${safe.message} ${safe.code || ""} ${safe.type || ""}`.toLowerCase().includes("response_format");
+        if (!useResponseFormat || !looksResponseFormatRelated) {
+          break;
+        }
+      }
+    }
+
+    if (completion) break;
+  }
+
+  if (!completion) {
+    const first = errors[0];
+    const summary = first
+      ? `${first.message}${first.status ? ` (status ${first.status})` : ""}${first.code ? ` code ${first.code}` : ""}${first.type ? ` type ${first.type}` : ""}`
+      : "OpenAI request failed before returning a response.";
+    const error = new Error(`OpenAI request failed: ${summary}`);
+    (error as Error & { openAiDebug?: OpenAiGenerationDebug; openAiErrors?: SafeOpenAiError[] }).openAiDebug = openAiDebug;
+    (error as Error & { openAiDebug?: OpenAiGenerationDebug; openAiErrors?: SafeOpenAiError[] }).openAiErrors = errors;
+    throw error;
   }
 
   const raw = completion.choices[0]?.message?.content;
-  if (!raw) throw new Error("OpenAI returned an empty content intelligence response.");
+  if (!raw) {
+    const error = new Error("OpenAI returned an empty content intelligence response.");
+    (error as Error & { openAiDebug?: OpenAiGenerationDebug }).openAiDebug = openAiDebug;
+    throw error;
+  }
 
   console.info("[openai][content-intelligence][response-received]", {
     finishReason: completion.choices[0]?.finish_reason,
@@ -368,7 +531,8 @@ Make the ideas specific to therapy, clinical safety, LionHeart Therapy, products
         openAiResponseReceived: true,
         rawResponsePreview: raw.slice(0, 1200),
         opportunitiesArrayParsed: false,
-        opportunityCount: 1
+        opportunityCount: 1,
+        ...openAiDebug
       }
     };
   }
@@ -388,7 +552,8 @@ Make the ideas specific to therapy, clinical safety, LionHeart Therapy, products
         openAiResponseReceived: true,
         rawResponsePreview: raw.slice(0, 1200),
         opportunitiesArrayParsed: false,
-        opportunityCount: 1
+        opportunityCount: 1,
+        ...openAiDebug
       }
     };
   }
@@ -416,7 +581,8 @@ Make the ideas specific to therapy, clinical safety, LionHeart Therapy, products
         openAiResponseReceived: true,
         rawResponsePreview: raw.slice(0, 1200),
         opportunitiesArrayParsed: true,
-        opportunityCount: 1
+        opportunityCount: 1,
+        ...openAiDebug
       }
     };
   }
@@ -434,7 +600,8 @@ Make the ideas specific to therapy, clinical safety, LionHeart Therapy, products
       openAiResponseReceived: true,
       rawResponsePreview: raw.slice(0, 1200),
       opportunitiesArrayParsed: true,
-      opportunityCount: normalized.length
+      opportunityCount: normalized.length,
+      ...openAiDebug
     }
   };
 }

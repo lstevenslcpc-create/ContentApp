@@ -160,6 +160,11 @@ type ApiDebugState = {
   openAiResponseReceived?: boolean;
   opportunitiesArrayParsed?: boolean;
   opportunityCount?: number;
+  modelUsed?: string;
+  openAiStatusCode?: number | string;
+  openAiErrorType?: string;
+  openAiErrorCode?: string;
+  minimalTestSucceeded?: boolean;
 };
 
 async function readApiResponse(response: Response) {
@@ -251,7 +256,12 @@ export function ContentIntelligenceClient() {
         opportunitiesArrayParsed: Boolean((data.debug as { opportunitiesArrayParsed?: boolean } | undefined)?.opportunitiesArrayParsed),
         opportunityCount: typeof (data.debug as { opportunityCount?: unknown } | undefined)?.opportunityCount === "number"
           ? (data.debug as { opportunityCount: number }).opportunityCount
-          : Array.isArray(data.opportunities) ? data.opportunities.length : 0
+          : Array.isArray(data.opportunities) ? data.opportunities.length : 0,
+        modelUsed: typeof (data.debug as { modelUsed?: unknown } | undefined)?.modelUsed === "string" ? (data.debug as { modelUsed: string }).modelUsed : undefined,
+        openAiStatusCode: typeof (data.debug as { openAiStatusCode?: unknown } | undefined)?.openAiStatusCode === "number" || typeof (data.debug as { openAiStatusCode?: unknown } | undefined)?.openAiStatusCode === "string" ? (data.debug as { openAiStatusCode: number | string }).openAiStatusCode : undefined,
+        openAiErrorType: typeof (data.debug as { openAiErrorType?: unknown } | undefined)?.openAiErrorType === "string" ? (data.debug as { openAiErrorType: string }).openAiErrorType : undefined,
+        openAiErrorCode: typeof (data.debug as { openAiErrorCode?: unknown } | undefined)?.openAiErrorCode === "string" ? (data.debug as { openAiErrorCode: string }).openAiErrorCode : undefined,
+        minimalTestSucceeded: Boolean((data.debug as { minimalTestSucceeded?: boolean } | undefined)?.minimalTestSucceeded)
       });
       setLoading(false);
       if (!response.ok) {
@@ -397,6 +407,10 @@ export function ContentIntelligenceClient() {
             <p className="font-bold text-[#172a3a]">Temporary API debug</p>
             <p>API status code: {apiDebug.statusCode ?? "unknown"}</p>
             <p>OpenAI response received: {apiDebug.openAiResponseReceived ? "yes" : "no"}</p>
+            <p>Model used: {apiDebug.modelUsed || "unknown"}</p>
+            <p>OpenAI status code: {apiDebug.openAiStatusCode ?? "unknown"}</p>
+            <p>OpenAI error type/code: {[apiDebug.openAiErrorType, apiDebug.openAiErrorCode].filter(Boolean).join(" / ") || "none"}</p>
+            <p>Minimal OpenAI test succeeded: {apiDebug.minimalTestSucceeded ? "yes" : "no"}</p>
             <p>Opportunities array parsed: {apiDebug.opportunitiesArrayParsed ? "yes" : "no"}</p>
             <p>Opportunity count: {apiDebug.opportunityCount ?? 0}</p>
             <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-lg bg-[#172a3a] p-3 text-[11px] leading-5 text-[#f3ecdf]">
