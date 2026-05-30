@@ -76,11 +76,27 @@ create table if not exists content_opportunities (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   topic text not null,
+  explanation text,
+  strongest_emotional_hook text,
+  curiosity_angle text,
+  save_worthy_angle text,
+  share_worthy_angle text,
+  comment_bait_potential text,
+  emotional_trigger_category text,
   audience text,
   content_pillar text,
   platform_recommendations jsonb default '{}'::jsonb,
   seo_keywords text[] default '{}',
+  virality_score integer,
+  emotional_resonance_score integer,
+  save_potential_score integer,
+  trust_building_score integer,
+  conversion_score integer,
+  seo_score integer,
+  pinterest_potential_score integer,
+  ai_search_potential_score integer,
   emotional_angle text,
+  visual_direction text,
   product_tie_in text,
   service_tie_in text,
   cta text,
@@ -180,11 +196,27 @@ alter table generated_content add column if not exists canva_design_url text;
 alter table generated_content add column if not exists canva_template_id text;
 alter table content_opportunities add column if not exists user_id uuid references auth.users(id) on delete cascade;
 alter table content_opportunities add column if not exists topic text;
+alter table content_opportunities add column if not exists explanation text;
+alter table content_opportunities add column if not exists strongest_emotional_hook text;
+alter table content_opportunities add column if not exists curiosity_angle text;
+alter table content_opportunities add column if not exists save_worthy_angle text;
+alter table content_opportunities add column if not exists share_worthy_angle text;
+alter table content_opportunities add column if not exists comment_bait_potential text;
+alter table content_opportunities add column if not exists emotional_trigger_category text;
 alter table content_opportunities add column if not exists audience text;
 alter table content_opportunities add column if not exists content_pillar text;
 alter table content_opportunities add column if not exists platform_recommendations jsonb default '{}'::jsonb;
 alter table content_opportunities add column if not exists seo_keywords text[] default '{}';
+alter table content_opportunities add column if not exists virality_score integer;
+alter table content_opportunities add column if not exists emotional_resonance_score integer;
+alter table content_opportunities add column if not exists save_potential_score integer;
+alter table content_opportunities add column if not exists trust_building_score integer;
+alter table content_opportunities add column if not exists conversion_score integer;
+alter table content_opportunities add column if not exists seo_score integer;
+alter table content_opportunities add column if not exists pinterest_potential_score integer;
+alter table content_opportunities add column if not exists ai_search_potential_score integer;
 alter table content_opportunities add column if not exists emotional_angle text;
+alter table content_opportunities add column if not exists visual_direction text;
 alter table content_opportunities add column if not exists product_tie_in text;
 alter table content_opportunities add column if not exists service_tie_in text;
 alter table content_opportunities add column if not exists cta text;

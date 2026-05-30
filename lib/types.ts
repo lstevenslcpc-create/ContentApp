@@ -151,13 +151,35 @@ export type ContentOpportunity = {
   user_id?: string | null;
   topic: string;
   explanation?: string;
+  strongest_emotional_hook?: string;
+  curiosity_angle?: string;
+  save_worthy_angle?: string;
+  share_worthy_angle?: string;
+  comment_bait_potential?: string;
+  emotional_trigger_category?:
+    | "validation"
+    | "identity recognition"
+    | "hidden symptom recognition"
+    | "self-awareness shock"
+    | "relationship tension"
+    | "nervous system education"
+    | string;
   audience: string;
   content_pillar: string;
   platform_recommendations: string[] | PlatformAngles | Record<string, unknown>;
   seo_keywords: string[];
   seo_opportunity_score?: number;
   emotional_engagement_score?: number;
+  virality_score?: number;
+  emotional_resonance_score?: number;
+  save_potential_score?: number;
+  trust_building_score?: number;
+  conversion_score?: number;
+  seo_score?: number;
+  pinterest_potential_score?: number;
+  ai_search_potential_score?: number;
   emotional_angle: string;
+  visual_direction?: string;
   product_tie_in?: string | null;
   service_tie_in?: string | null;
   cta: string;
@@ -238,6 +260,12 @@ export type ContentGenerationRequest = {
     content_pillar: string;
     seo_keywords: string[];
     emotional_angle: string;
+    strongest_emotional_hook?: string;
+    curiosity_angle?: string;
+    save_worthy_angle?: string;
+    share_worthy_angle?: string;
+    emotional_trigger_category?: string;
+    visual_direction?: string;
     product_tie_in?: string | null;
     service_tie_in?: string | null;
     cta: string;

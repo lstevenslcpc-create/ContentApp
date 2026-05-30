@@ -25,6 +25,12 @@ Content Intelligence Brief:
 - Content pillar: ${request.intelligenceBrief.content_pillar}
 - SEO keywords: ${request.intelligenceBrief.seo_keywords.join(", ")}
 - Emotional angle: ${request.intelligenceBrief.emotional_angle}
+- Strongest hook: ${request.intelligenceBrief.strongest_emotional_hook || "Not provided"}
+- Curiosity angle: ${request.intelligenceBrief.curiosity_angle || "Not provided"}
+- Save-worthy angle: ${request.intelligenceBrief.save_worthy_angle || "Not provided"}
+- Share-worthy angle: ${request.intelligenceBrief.share_worthy_angle || "Not provided"}
+- Emotional trigger category: ${request.intelligenceBrief.emotional_trigger_category || "Not provided"}
+- Visual direction: ${request.intelligenceBrief.visual_direction || "Not provided"}
 - Product tie-in: ${request.intelligenceBrief.product_tie_in || "None"}
 - Service tie-in: ${request.intelligenceBrief.service_tie_in || "None"}
 - Required CTA direction: ${request.intelligenceBrief.cta}

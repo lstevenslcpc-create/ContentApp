@@ -11,6 +11,12 @@ const starterOpportunities: ContentOpportunity[] = [
   {
     topic: "What high-functioning anxiety looks like when nobody can tell",
     explanation: "A trust-building topic that validates capable clients who feel internally overwhelmed. Strong fit for carousels, short scripts, and SEO language around high-functioning anxiety.",
+    strongest_emotional_hook: "If everyone thinks you are calm, but your brain is running a private emergency meeting...",
+    curiosity_angle: "Names the gap between outside competence and inside panic.",
+    save_worthy_angle: "Gives high achievers language for a pattern they may not know how to explain.",
+    share_worthy_angle: "Easy to send to a friend who looks fine but is quietly overwhelmed.",
+    comment_bait_potential: "What is one anxiety behavior people mistake for being responsible?",
+    emotional_trigger_category: "hidden symptom recognition",
     audience: "high-achieving anxious women",
     content_pillar: "Trust-building",
     platform_recommendations: {
@@ -24,7 +30,16 @@ const starterOpportunities: ContentOpportunity[] = [
     seo_keywords: ["high-functioning anxiety", "anxiety therapy", "therapy for anxious women"],
     seo_opportunity_score: 86,
     emotional_engagement_score: 91,
+    virality_score: 82,
+    emotional_resonance_score: 93,
+    save_potential_score: 90,
+    trust_building_score: 88,
+    conversion_score: 76,
+    seo_score: 86,
+    pinterest_potential_score: 78,
+    ai_search_potential_score: 84,
     emotional_angle: "Helps people feel seen without shame.",
+    visual_direction: "Notebook-style carousel with a calm navy margin, handwritten inner-dialogue lines, and soft cream backgrounds.",
     product_tie_in: "Anxious AF Workbook",
     service_tie_in: "Anxiety Therapy",
     cta: "Save this and schedule a consultation if anxiety is running the show behind the scenes.",
@@ -34,6 +49,12 @@ const starterOpportunities: ContentOpportunity[] = [
   {
     topic: "How to talk to your teen when anxiety comes out as attitude",
     explanation: "A parent-facing idea that reframes behavior with empathy and clinical nuance. Useful for Facebook, Instagram, and service pages around teen therapy.",
+    strongest_emotional_hook: "Your teen may not be giving you attitude. Their anxiety may be out of words.",
+    curiosity_angle: "Reframes a common parent-teen conflict in a way that lowers defensiveness.",
+    save_worthy_angle: "Parents can save it as a conversation reset before the next blowup.",
+    share_worthy_angle: "Highly shareable among parents who feel worried and rejected.",
+    comment_bait_potential: "What behavior in your teen is hardest not to take personally?",
+    emotional_trigger_category: "relationship tension",
     audience: "parents of anxious teen girls",
     content_pillar: "Education",
     platform_recommendations: {
@@ -47,7 +68,16 @@ const starterOpportunities: ContentOpportunity[] = [
     seo_keywords: ["teen anxiety", "teen therapy", "therapy for teen girls"],
     seo_opportunity_score: 82,
     emotional_engagement_score: 88,
+    virality_score: 79,
+    emotional_resonance_score: 89,
+    save_potential_score: 86,
+    trust_building_score: 91,
+    conversion_score: 82,
+    seo_score: 82,
+    pinterest_potential_score: 75,
+    ai_search_potential_score: 80,
     emotional_angle: "Reduces parent blame and teen shame.",
+    visual_direction: "Text-message style carousel contrasting parent interpretation with teen inner dialogue, using sage accents.",
     product_tie_in: "Teen Mental Health Workbook",
     service_tie_in: "Teen Therapy",
     cta: "Reach out to explore therapy support for your teen.",
@@ -57,6 +87,12 @@ const starterOpportunities: ContentOpportunity[] = [
   {
     topic: "A Sunday reset for people who are tired of starting over every Monday",
     explanation: "A gentle product and email-friendly idea that connects burnout, routines, and low-pressure reset rituals. Strong tie-in for toolkit content without sounding salesy.",
+    strongest_emotional_hook: "You do not need a new personality by Monday. You may just need a softer reset.",
+    curiosity_angle: "Challenges the all-or-nothing reset culture that burnt-out women are tired of.",
+    save_worthy_angle: "A low-pressure ritual people can return to on Sunday nights.",
+    share_worthy_angle: "Useful for friends who keep trying to overhaul their life every week.",
+    comment_bait_potential: "What part of Sunday makes your nervous system tense up?",
+    emotional_trigger_category: "validation",
     audience: "overwhelmed moms and high-achieving anxious women",
     content_pillar: "Product",
     platform_recommendations: {
@@ -70,7 +106,16 @@ const starterOpportunities: ContentOpportunity[] = [
     seo_keywords: ["reset ritual", "burnout toolkit", "anxiety reset"],
     seo_opportunity_score: 74,
     emotional_engagement_score: 84,
+    virality_score: 76,
+    emotional_resonance_score: 87,
+    save_potential_score: 92,
+    trust_building_score: 80,
+    conversion_score: 83,
+    seo_score: 74,
+    pinterest_potential_score: 88,
+    ai_search_potential_score: 76,
     emotional_angle: "Offers relief without demanding a full life overhaul.",
+    visual_direction: "Cozy desk scene with journal, muted gold pen, warm lamp, and clean Pinterest infographic overlay.",
     product_tie_in: "Reset Ritual Toolkit",
     service_tie_in: "Anxiety Therapy",
     cta: "Try one small reset and explore the toolkit when you want more structure.",
@@ -106,8 +151,8 @@ export function ContentIntelligenceClient() {
   const [busyTopic, setBusyTopic] = useState("");
 
   const topScores = useMemo(() => {
-    const seo = Math.round(opportunities.reduce((sum, item) => sum + (item.seo_opportunity_score || 0), 0) / Math.max(opportunities.length, 1));
-    const emotional = Math.round(opportunities.reduce((sum, item) => sum + (item.emotional_engagement_score || 0), 0) / Math.max(opportunities.length, 1));
+    const seo = Math.round(opportunities.reduce((sum, item) => sum + (item.seo_score || item.seo_opportunity_score || 0), 0) / Math.max(opportunities.length, 1));
+    const emotional = Math.round(opportunities.reduce((sum, item) => sum + (item.emotional_resonance_score || item.emotional_engagement_score || 0), 0) / Math.max(opportunities.length, 1));
     return { seo, emotional };
   }, [opportunities]);
 
@@ -165,6 +210,12 @@ export function ContentIntelligenceClient() {
           content_pillar: opportunity.content_pillar,
           seo_keywords: opportunity.seo_keywords,
           emotional_angle: opportunity.emotional_angle,
+          strongest_emotional_hook: opportunity.strongest_emotional_hook,
+          curiosity_angle: opportunity.curiosity_angle,
+          save_worthy_angle: opportunity.save_worthy_angle,
+          share_worthy_angle: opportunity.share_worthy_angle,
+          emotional_trigger_category: opportunity.emotional_trigger_category,
+          visual_direction: opportunity.visual_direction,
           product_tie_in: opportunity.product_tie_in,
           service_tie_in: opportunity.service_tie_in,
           cta: opportunity.cta,
@@ -188,10 +239,10 @@ export function ContentIntelligenceClient() {
           <div>
             <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-[#eadfc8]">
               <Brain size={14} />
-              Content Intelligence Engine
+              Humanized Content Intelligence Engine
             </p>
-            <h1 className="mt-4 max-w-3xl text-3xl font-bold tracking-tight sm:text-4xl">Know what LionHeart Therapy should create next.</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-[#f3ecdf]">AI-assisted strategy suggestions based on Brand Brain, SEO reasoning, audience pain points, products, services, and clinical safety. Live trend APIs are not connected yet.</p>
+            <h1 className="mt-4 max-w-3xl text-3xl font-bold tracking-tight sm:text-4xl">Create from the exact feeling your audience has not found words for yet.</h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-[#f3ecdf]">AI-assisted strategy suggestions based on Brand Brain, hidden anxiety behaviors, emotional contradictions, social-native hooks, SEO, products, services, and clinical safety. Live trend APIs are not connected yet.</p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
             <ScoreCard label="Avg SEO opportunity" value={topScores.seo} />
@@ -232,7 +283,7 @@ export function ContentIntelligenceClient() {
         <div className="mb-4 flex items-end justify-between gap-3">
           <div>
             <h2 className="text-2xl font-bold text-[#172a3a]">Weekly Content Opportunities</h2>
-            <p className="mt-1 text-sm text-[#6f766f]">Editorial ideas ranked by strategic fit, emotional resonance, and conversion tie-in.</p>
+            <p className="mt-1 text-sm text-[#6f766f]">Editorial ideas ranked by emotional resonance, save/share potential, trust, search, and conversion fit.</p>
           </div>
           <span className="hidden rounded-full bg-[#f7f1e6] px-3 py-1.5 text-xs font-bold text-[#77633c] sm:inline-flex">AI-assisted strategy</span>
         </div>
@@ -255,6 +306,16 @@ export function ContentIntelligenceClient() {
 
 function OpportunityCard({ opportunity, saved, busy, onSave, onGenerate }: { opportunity: ContentOpportunity; saved: boolean; busy: boolean; onSave: () => void; onGenerate: () => void }) {
   const angles = opportunity.platform_recommendations as PlatformAngles;
+  const scoreItems = [
+    ["Viral", opportunity.virality_score],
+    ["Resonance", opportunity.emotional_resonance_score || opportunity.emotional_engagement_score],
+    ["Save", opportunity.save_potential_score],
+    ["Trust", opportunity.trust_building_score],
+    ["Convert", opportunity.conversion_score],
+    ["SEO", opportunity.seo_score || opportunity.seo_opportunity_score],
+    ["Pinterest", opportunity.pinterest_potential_score],
+    ["AI search", opportunity.ai_search_potential_score]
+  ];
 
   return (
     <article className="rounded-3xl border border-[#e9dfcf] bg-white p-5 shadow-sm">
@@ -263,8 +324,15 @@ function OpportunityCard({ opportunity, saved, busy, onSave, onGenerate }: { opp
           <div className="flex flex-wrap items-center gap-2">
             <Pill>{opportunity.content_pillar}</Pill>
             <Sensitivity level={opportunity.clinical_sensitivity} />
+            {opportunity.emotional_trigger_category && <TriggerBadge>{opportunity.emotional_trigger_category}</TriggerBadge>}
           </div>
           <h3 className="mt-4 text-2xl font-bold leading-tight text-[#172a3a]">{opportunity.topic}</h3>
+          {opportunity.strongest_emotional_hook && (
+            <div className="mt-4 rounded-2xl border border-[#eadfc8] bg-[#fffdf8] p-4">
+              <p className="text-xs font-bold uppercase tracking-wide text-[#b89b5e]">Strongest emotional hook</p>
+              <p className="mt-2 text-lg font-bold leading-7 text-[#172a3a]">“{opportunity.strongest_emotional_hook}”</p>
+            </div>
+          )}
           <p className="mt-3 text-sm leading-6 text-[#5f675f]">{opportunity.explanation}</p>
 
           <div className="mt-5 grid gap-3 md:grid-cols-2">
@@ -273,6 +341,23 @@ function OpportunityCard({ opportunity, saved, busy, onSave, onGenerate }: { opp
             <Detail label="Emotional angle" value={opportunity.emotional_angle} />
             <Detail label="Recommended CTA" value={opportunity.cta} />
           </div>
+
+          <details className="mt-5 rounded-2xl border border-[#eadfc8] bg-[#f8f3ea] p-4" open>
+            <summary className="cursor-pointer text-sm font-bold text-[#172a3a]">Viral psychology layer</summary>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <Detail label="Curiosity angle" value={opportunity.curiosity_angle || "Add a curiosity gap after generation."} />
+              <Detail label="Save-worthy angle" value={opportunity.save_worthy_angle || "Add a practical save reason after generation."} />
+              <Detail label="Share-worthy angle" value={opportunity.share_worthy_angle || "Add a share reason after generation."} />
+              <Detail label="Comment bait potential" value={opportunity.comment_bait_potential || "Add a clinically safe comment prompt after generation."} />
+            </div>
+          </details>
+
+          {opportunity.visual_direction && (
+            <div className="mt-5 rounded-2xl bg-[#eef3ec] p-4">
+              <p className="text-xs font-bold uppercase tracking-wide text-[#4f6f5a]">Visual direction</p>
+              <p className="mt-2 text-sm leading-6 text-[#20313f]">{opportunity.visual_direction}</p>
+            </div>
+          )}
 
           <div className="mt-5 flex flex-wrap gap-2">
             {(opportunity.seo_keywords || []).map((keyword) => <span key={keyword} className="rounded-full bg-[#eef3ec] px-3 py-1 text-xs font-bold text-[#4f6f5a]">{keyword}</span>)}
@@ -295,9 +380,12 @@ function OpportunityCard({ opportunity, saved, busy, onSave, onGenerate }: { opp
                 service_tie_in: opportunity.service_tie_in || null,
                 text_content: [
                   opportunity.topic,
+                  opportunity.strongest_emotional_hook,
                   opportunity.explanation,
                   `Audience: ${opportunity.audience}`,
+                  `Trigger: ${opportunity.emotional_trigger_category || ""}`,
                   `CTA: ${opportunity.cta}`,
+                  `Visual: ${opportunity.visual_direction || ""}`,
                   `Angles: ${JSON.stringify(opportunity.platform_recommendations)}`
                 ].filter(Boolean).join("\n\n"),
                 tags: [opportunity.audience, opportunity.content_pillar, ...(opportunity.seo_keywords || [])].filter(Boolean),
@@ -317,22 +405,25 @@ function OpportunityCard({ opportunity, saved, busy, onSave, onGenerate }: { opp
         </div>
 
         <div className="rounded-2xl bg-[#f8f3ea] p-4">
-          <div className="grid grid-cols-2 gap-3">
-            <ScoreCard label="SEO" value={opportunity.seo_opportunity_score || 0} compact />
-            <ScoreCard label="Emotion" value={opportunity.emotional_engagement_score || 0} compact />
+          <div className="grid grid-cols-2 gap-2">
+            {scoreItems.map(([label, value]) => (
+              <MiniScore key={label as string} label={label as string} value={Number(value || 0)} />
+            ))}
           </div>
-          <h4 className="mt-5 text-sm font-bold uppercase tracking-wide text-[#77633c]">Platform Angle Cards</h4>
-          <div className="mt-3 grid gap-3">
-            {Object.entries(prettyAngleLabels).map(([key, label]) => {
-              const Icon = angleIcons[key as keyof typeof angleIcons];
-              return (
-                <div key={key} className="rounded-xl border border-[#eadfc8] bg-white/80 p-3">
-                  <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-[#172a3a]"><Icon size={14} />{label}</p>
-                  <p className="mt-2 text-sm leading-5 text-[#5f675f]">{angles?.[key as keyof PlatformAngles] || "Angle will be refined after generation."}</p>
-                </div>
-              );
-            })}
-          </div>
+          <details className="mt-5" open>
+            <summary className="cursor-pointer text-sm font-bold uppercase tracking-wide text-[#77633c]">Platform-native strategy</summary>
+            <div className="mt-3 grid gap-3">
+              {Object.entries(prettyAngleLabels).map(([key, label]) => {
+                const Icon = angleIcons[key as keyof typeof angleIcons];
+                return (
+                  <div key={key} className="rounded-xl border border-[#eadfc8] bg-white/80 p-3">
+                    <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-[#172a3a]"><Icon size={14} />{label}</p>
+                    <p className="mt-2 text-sm leading-5 text-[#5f675f]">{angles?.[key as keyof PlatformAngles] || "Angle will be refined after generation."}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </details>
         </div>
       </div>
     </article>
@@ -348,6 +439,20 @@ function ScoreCard({ label, value, compact }: { label: string; value: number; co
   );
 }
 
+function MiniScore({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-xl bg-white p-3 ring-1 ring-[#eadfc8]">
+      <p className="text-[10px] font-bold uppercase tracking-wide text-[#77633c]">{label}</p>
+      <div className="mt-2 flex items-center gap-2">
+        <span className="text-xl font-bold text-[#172a3a]">{value}</span>
+        <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#f1e8d8]">
+          <span className="block h-full rounded-full bg-[#c9b7ee]" style={{ width: `${Math.min(Math.max(value, 0), 100)}%` }} />
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function Detail({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl bg-[#fffdf8] p-4 ring-1 ring-[#eadfc8]">
@@ -359,6 +464,10 @@ function Detail({ label, value }: { label: string; value: string }) {
 
 function Pill({ children }: { children: React.ReactNode }) {
   return <span className="rounded-full bg-[#f7f1e6] px-3 py-1 text-xs font-bold text-[#77633c]">{children}</span>;
+}
+
+function TriggerBadge({ children }: { children: React.ReactNode }) {
+  return <span className="rounded-full bg-[#eee8fb] px-3 py-1 text-xs font-bold text-[#4d3a7a]">{children}</span>;
 }
 
 function Sensitivity({ level }: { level: ContentOpportunity["clinical_sensitivity"] }) {
