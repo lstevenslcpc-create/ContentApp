@@ -80,6 +80,27 @@ async function contentOpportunitySchemaCheck() {
   }
 }
 
+async function brandBrainSchemaCheck() {
+  try {
+    const supabase = getSupabaseAdmin();
+    const { error } = await supabase
+      .from("brand_brains")
+      .select("id,user_id,brand_name,voice_and_tone,clinical_safety_rules")
+      .limit(1);
+
+    return {
+      ok: !error,
+      error: error?.message
+    };
+  } catch (error) {
+    const details = errorDetails(error);
+    return {
+      ok: false,
+      error: typeof details === "object" && details && "message" in details ? String(details.message) : "Unable to check brand_brains schema."
+    };
+  }
+}
+
 function toOpportunityRow(opportunity: ContentOpportunity, userId: string) {
   return {
     user_id: userId,
@@ -147,6 +168,7 @@ export async function GET(request: Request) {
         userDetected,
         env: getSupabaseEnvStatus(),
         contentOpportunitiesSchema: await contentOpportunitySchemaCheck(),
+        brandBrainsSchema: await brandBrainSchemaCheck(),
         warnings: envWarnings()
       });
     }
@@ -182,6 +204,7 @@ export async function POST(request: Request) {
         userDetected: Boolean(user.id),
         env: getSupabaseEnvStatus(),
         contentOpportunitiesSchema: await contentOpportunitySchemaCheck(),
+        brandBrainsSchema: await brandBrainSchemaCheck(),
         warnings: envWarnings()
       });
     }
