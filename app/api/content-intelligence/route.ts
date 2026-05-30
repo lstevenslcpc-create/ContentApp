@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { authErrorResponse, requireApiUser } from "@/lib/auth";
 import { generateContentOpportunities } from "@/lib/openai";
-import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { getSupabaseAdmin, getSupabaseEnvStatus } from "@/lib/supabaseAdmin";
 import type { ContentOpportunity } from "@/lib/types";
 
 function errorDetails(error: unknown) {
@@ -23,10 +23,20 @@ function errorDetails(error: unknown) {
 function clientError(error: unknown, fallback: string) {
   const details = errorDetails(error);
   const message = typeof details === "object" && details && "message" in details ? String(details.message) : fallback;
+  const status = typeof details === "object" && details && "status" in details ? details.status : undefined;
+  const code = typeof details === "object" && details && "code" in details ? details.code : undefined;
   return {
     error: message || fallback,
-    details: process.env.NODE_ENV === "development" ? details : undefined
+    details: process.env.NODE_ENV === "development" ? details : { message: message || fallback, status, code },
+    env: getSupabaseEnvStatus()
   };
+}
+
+function envWarnings() {
+  const env = getSupabaseEnvStatus();
+  return Object.entries(env)
+    .filter(([, present]) => !present)
+    .map(([name]) => `${name} is not set in the server environment.`);
 }
 
 function toOpportunityRow(opportunity: ContentOpportunity, userId: string) {
@@ -82,6 +92,16 @@ function toLegacyOpportunityRow(opportunity: ContentOpportunity, userId: string)
 export async function GET(request: Request) {
   try {
     const user = await requireApiUser(request);
+    const url = new URL(request.url);
+    if (url.searchParams.get("diagnostics") === "1") {
+      return NextResponse.json({
+        ok: true,
+        userDetected: Boolean(user.id),
+        env: getSupabaseEnvStatus(),
+        warnings: envWarnings()
+      });
+    }
+
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase
       .from("content_opportunities")
@@ -105,11 +125,22 @@ export async function POST(request: Request) {
     const user = await requireApiUser(request);
     const body = await request.json();
     const action = body.action || "generate";
-    if (!process.env.OPENAI_API_KEY && action === "generate") {
-      return NextResponse.json({ error: "OPENAI_API_KEY is missing. Add it in Netlify environment variables and redeploy." }, { status: 500 });
+
+    if (action === "diagnostics") {
+      return NextResponse.json({
+        ok: true,
+        userDetected: Boolean(user.id),
+        env: getSupabaseEnvStatus(),
+        warnings: envWarnings()
+      });
     }
 
-    const supabase = getSupabaseAdmin();
+    if (!process.env.OPENAI_API_KEY && action === "generate") {
+      return NextResponse.json({
+        error: "OpenAI is not configured in production. Add OPENAI_API_KEY in Netlify environment variables and redeploy.",
+        env: getSupabaseEnvStatus()
+      }, { status: 500 });
+    }
 
     if (action === "generate") {
       const theme = String(body.theme || "").trim();
@@ -117,24 +148,41 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Enter a theme to generate content opportunities." }, { status: 400 });
       }
 
-      const { data: brandBrain, error: brandBrainError } = await supabase
-        .from("brand_brains")
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle();
+      let brandBrain = null;
+      const warnings = envWarnings();
 
-      if (brandBrainError) {
-        console.warn("[content-intelligence][brand-brain-fallback]", errorDetails(brandBrainError));
+      try {
+        const supabase = getSupabaseAdmin();
+        const { data, error: brandBrainError } = await supabase
+          .from("brand_brains")
+          .select("*")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        if (brandBrainError) {
+          console.warn("[content-intelligence][brand-brain-fallback]", errorDetails(brandBrainError));
+          warnings.push(`Brand Brain could not be loaded: ${brandBrainError.message}`);
+        } else {
+          brandBrain = data;
+        }
+      } catch (brandBrainError) {
+        console.warn("[content-intelligence][brand-brain-setup-fallback]", errorDetails(brandBrainError));
+        const details = errorDetails(brandBrainError);
+        const message = typeof details === "object" && details && "message" in details ? String(details.message) : "Brand Brain could not be loaded.";
+        warnings.push(message);
       }
 
-      const opportunities = await generateContentOpportunities(theme, brandBrainError ? null : brandBrain);
+      const opportunities = await generateContentOpportunities(theme, brandBrain);
       return NextResponse.json({
         opportunities,
-        disclaimer: "AI-assisted content strategy suggestions. Live search and social trend APIs are not connected yet."
+        disclaimer: "AI-assisted content strategy suggestions. Live search and social trend APIs are not connected yet.",
+        warnings: warnings.length ? warnings : undefined,
+        env: getSupabaseEnvStatus()
       });
     }
 
     if (action === "save") {
+      const supabase = getSupabaseAdmin();
       const opportunity = body.opportunity as ContentOpportunity | undefined;
       if (!opportunity?.topic) {
         return NextResponse.json({ error: "A content opportunity is required." }, { status: 400 });
@@ -158,10 +206,13 @@ export async function POST(request: Request) {
           console.error("[content-intelligence][save-legacy-row-failed]", errorDetails(legacyError));
           return NextResponse.json(
             {
+              opportunity,
+              warning: "Supabase could not save this idea, but the generated opportunity is still available on the page.",
               error: legacyError.message || error.message || "Unable to save idea.",
-              details: process.env.NODE_ENV === "development" ? { fullRowError: error, legacyRowError: legacyError } : undefined
+              details: process.env.NODE_ENV === "development" ? { fullRowError: error, legacyRowError: legacyError } : { fullRowError: error.message, legacyRowError: legacyError.message },
+              env: getSupabaseEnvStatus()
             },
-            { status: 500 }
+            { status: 200 }
           );
         }
 

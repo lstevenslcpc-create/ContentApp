@@ -156,8 +156,15 @@ async function readApiResponse(response: Response) {
 function formatApiError(data: Record<string, unknown>, fallback: string) {
   const error = typeof data.error === "string" ? data.error : fallback;
   const warning = typeof data.warning === "string" ? data.warning : "";
+  const warnings = Array.isArray(data.warnings) ? data.warnings.map(String).join(" ") : "";
   const details = typeof data.details === "string" ? data.details : "";
-  return [error, warning, details].filter(Boolean).join(" ");
+  const env = data.env && typeof data.env === "object"
+    ? Object.entries(data.env as Record<string, boolean>)
+      .filter(([, present]) => !present)
+      .map(([name]) => `${name} missing`)
+      .join("; ")
+    : "";
+  return [error, warning, warnings, details, env].filter(Boolean).join(" ");
 }
 
 export function ContentIntelligenceClient() {
@@ -190,7 +197,8 @@ export function ContentIntelligenceClient() {
         return;
       }
       setOpportunities(Array.isArray(data.opportunities) ? data.opportunities as ContentOpportunity[] : []);
-      setMessage(typeof data.disclaimer === "string" ? data.disclaimer : "AI-assisted content strategy suggestions generated.");
+      const warnings = Array.isArray(data.warnings) ? ` ${data.warnings.map(String).join(" ")}` : "";
+      setMessage(`${typeof data.disclaimer === "string" ? data.disclaimer : "AI-assisted content strategy suggestions generated."}${warnings}`);
     } catch (error) {
       setLoading(false);
       setMessage(error instanceof Error ? error.message : "Network error while generating content opportunities.");
