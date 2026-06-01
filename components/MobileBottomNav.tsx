@@ -3,13 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
-import { Brain, Compass, Home, Image, LogIn, Sparkles, UserCircle2 } from "lucide-react";
+import { Brain, CheckSquare, Compass, Home, Image, LogIn, UserCircle2 } from "lucide-react";
 
 const nav = [
   { href: "/dashboard", label: "Home", icon: Home },
   { href: "/brand-brain", label: "Brain", icon: Brain },
   { href: "/content-intelligence", label: "Ideas", icon: Compass },
-  { href: "/content-generator", label: "Create", icon: Sparkles },
+  { href: "/approval-review", label: "Review", icon: CheckSquare },
   { href: "/media-generator", label: "Media", icon: Image }
 ];
 

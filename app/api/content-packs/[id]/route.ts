@@ -7,6 +7,7 @@ import type { ContentOpportunity, ContentPackBody, ContentStatus } from "@/lib/t
 export const runtime = "nodejs";
 
 const allowedStatuses: ContentStatus[] = ["draft", "needs_review", "approved", "scheduled", "posted", "failed"];
+const allowedDesignStatuses = ["not_started", "ready_for_canva", "designed_in_canva"];
 
 function errorMessage(error: unknown) {
   if (error instanceof Error) return error.message;
@@ -104,6 +105,21 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     if (body.pack && typeof body.pack === "object") {
       updates.pack = body.pack as ContentPackBody;
+    }
+
+    if (body.designStatus) {
+      if (!allowedDesignStatuses.includes(body.designStatus)) {
+        return NextResponse.json({ ok: false, error: "Unsupported Canva design status." }, { status: 400 });
+      }
+      updates.design_status = body.designStatus;
+    }
+
+    if (body.canvaBrief && typeof body.canvaBrief === "object") {
+      updates.canva_brief = body.canvaBrief;
+    }
+
+    if (body.metadata && typeof body.metadata === "object") {
+      updates.metadata = body.metadata;
     }
 
     if (!Object.keys(updates).length) {

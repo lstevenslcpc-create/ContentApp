@@ -218,7 +218,9 @@ export type ContentPack = {
   product_tie_in?: string | null;
   service_tie_in?: string | null;
   clinical_sensitivity?: "low" | "medium" | "high" | string | null;
+  design_status?: "not_started" | "ready_for_canva" | "designed_in_canva" | string | null;
   pack: ContentPackBody;
+  canva_brief?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
   created_at?: string;
   updated_at?: string;

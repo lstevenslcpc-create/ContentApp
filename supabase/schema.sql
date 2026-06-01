@@ -145,11 +145,14 @@ create table if not exists content_packs (
   product_tie_in text,
   service_tie_in text,
   clinical_sensitivity text,
+  design_status text default 'not_started',
   pack jsonb default '{}'::jsonb,
+  canva_brief jsonb default '{}'::jsonb,
   metadata jsonb default '{}'::jsonb,
   created_at timestamptz default now(),
   updated_at timestamptz default now(),
   constraint content_packs_status_check check (status in ('draft', 'needs_review', 'approved', 'scheduled', 'posted', 'failed')),
+  constraint content_packs_design_status_check check (design_status in ('not_started', 'ready_for_canva', 'designed_in_canva')),
   constraint content_packs_clinical_sensitivity_check check (clinical_sensitivity is null or clinical_sensitivity in ('low', 'medium', 'high'))
 );
 
@@ -303,7 +306,9 @@ alter table content_packs add column if not exists content_pillar text;
 alter table content_packs add column if not exists product_tie_in text;
 alter table content_packs add column if not exists service_tie_in text;
 alter table content_packs add column if not exists clinical_sensitivity text;
+alter table content_packs add column if not exists design_status text default 'not_started';
 alter table content_packs add column if not exists pack jsonb default '{}'::jsonb;
+alter table content_packs add column if not exists canva_brief jsonb default '{}'::jsonb;
 alter table content_packs add column if not exists metadata jsonb default '{}'::jsonb;
 alter table content_calendar_plans add column if not exists user_id uuid references auth.users(id) on delete cascade;
 alter table content_calendar_plans add column if not exists content_pack_id uuid references content_packs(id) on delete set null;
