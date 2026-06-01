@@ -153,6 +153,39 @@ create table if not exists content_packs (
   constraint content_packs_clinical_sensitivity_check check (clinical_sensitivity is null or clinical_sensitivity in ('low', 'medium', 'high'))
 );
 
+create table if not exists content_calendar_plans (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  content_pack_id uuid references content_packs(id) on delete set null,
+  planned_date date not null,
+  status text default 'idea',
+  campaign_label text,
+  focus_label text,
+  seasonal_prompt text,
+  notes text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  constraint content_calendar_plans_status_check check (status in ('idea', 'draft', 'needs_review', 'approved', 'scheduled', 'posted', 'failed'))
+);
+
+create index if not exists content_calendar_plans_user_date_idx
+on content_calendar_plans(user_id, planned_date);
+
+create index if not exists content_calendar_plans_pack_idx
+on content_calendar_plans(content_pack_id);
+
+create table if not exists content_calendar_focuses (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  week_start date not null,
+  focus text not null default '',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create unique index if not exists content_calendar_focuses_user_week_idx
+on content_calendar_focuses(user_id, week_start);
+
 create table if not exists social_accounts (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete cascade,
@@ -272,6 +305,17 @@ alter table content_packs add column if not exists service_tie_in text;
 alter table content_packs add column if not exists clinical_sensitivity text;
 alter table content_packs add column if not exists pack jsonb default '{}'::jsonb;
 alter table content_packs add column if not exists metadata jsonb default '{}'::jsonb;
+alter table content_calendar_plans add column if not exists user_id uuid references auth.users(id) on delete cascade;
+alter table content_calendar_plans add column if not exists content_pack_id uuid references content_packs(id) on delete set null;
+alter table content_calendar_plans add column if not exists planned_date date;
+alter table content_calendar_plans add column if not exists status text default 'idea';
+alter table content_calendar_plans add column if not exists campaign_label text;
+alter table content_calendar_plans add column if not exists focus_label text;
+alter table content_calendar_plans add column if not exists seasonal_prompt text;
+alter table content_calendar_plans add column if not exists notes text;
+alter table content_calendar_focuses add column if not exists user_id uuid references auth.users(id) on delete cascade;
+alter table content_calendar_focuses add column if not exists week_start date;
+alter table content_calendar_focuses add column if not exists focus text default '';
 alter table social_accounts add column if not exists user_id uuid references auth.users(id) on delete cascade;
 alter table analytics_events add column if not exists user_id uuid references auth.users(id) on delete cascade;
 
@@ -313,6 +357,16 @@ create trigger content_packs_updated_at
 before update on content_packs
 for each row execute procedure set_updated_at();
 
+drop trigger if exists content_calendar_plans_updated_at on content_calendar_plans;
+create trigger content_calendar_plans_updated_at
+before update on content_calendar_plans
+for each row execute procedure set_updated_at();
+
+drop trigger if exists content_calendar_focuses_updated_at on content_calendar_focuses;
+create trigger content_calendar_focuses_updated_at
+before update on content_calendar_focuses
+for each row execute procedure set_updated_at();
+
 drop trigger if exists integration_connections_updated_at on integration_connections;
 create trigger integration_connections_updated_at
 before update on integration_connections
@@ -324,6 +378,8 @@ alter table generated_content enable row level security;
 alter table content_opportunities enable row level security;
 alter table media_library enable row level security;
 alter table content_packs enable row level security;
+alter table content_calendar_plans enable row level security;
+alter table content_calendar_focuses enable row level security;
 alter table social_accounts enable row level security;
 alter table analytics_events enable row level security;
 alter table integration_connections enable row level security;
@@ -361,6 +417,18 @@ with check (auth.uid() = user_id);
 drop policy if exists "Users can manage their content packs" on content_packs;
 create policy "Users can manage their content packs"
 on content_packs for all
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+drop policy if exists "Users can manage their content calendar plans" on content_calendar_plans;
+create policy "Users can manage their content calendar plans"
+on content_calendar_plans for all
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+drop policy if exists "Users can manage their content calendar focuses" on content_calendar_focuses;
+create policy "Users can manage their content calendar focuses"
+on content_calendar_focuses for all
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
 

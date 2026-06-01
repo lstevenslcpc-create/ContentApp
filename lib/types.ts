@@ -224,6 +224,32 @@ export type ContentPack = {
   updated_at?: string;
 };
 
+export type CalendarPlanStatus = "idea" | ContentStatus;
+
+export type ContentCalendarPlan = {
+  id: string;
+  user_id?: string | null;
+  content_pack_id?: string | null;
+  planned_date: string;
+  status: CalendarPlanStatus;
+  campaign_label?: string | null;
+  focus_label?: string | null;
+  seasonal_prompt?: string | null;
+  notes?: string | null;
+  content_pack?: ContentPack | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type ContentCalendarFocus = {
+  id: string;
+  user_id?: string | null;
+  week_start: string;
+  focus: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
 export type MediaLibraryStatus = "draft" | "saved" | "approved" | "used" | "archived";
 
 export type MediaLibraryAsset = {
