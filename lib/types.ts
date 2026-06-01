@@ -219,9 +219,31 @@ export type ContentPack = {
   service_tie_in?: string | null;
   clinical_sensitivity?: "low" | "medium" | "high" | string | null;
   design_status?: "not_started" | "ready_for_canva" | "designed_in_canva" | string | null;
+  canva_template_id?: string | null;
   pack: ContentPackBody;
   canva_brief?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type CanvaTemplate = {
+  id: string;
+  user_id?: string | null;
+  template_name: string;
+  canva_template_link: string;
+  format_type: "Instagram carousel" | "Pinterest pin" | "Reel cover" | "Story" | "Workbook promo" | "Blog graphic" | "Quote post" | string;
+  dimensions?: string | null;
+  aesthetic_vibe?: string | null;
+  color_palette?: string | null;
+  font_style?: string | null;
+  graphic_style?: string | null;
+  best_use_case?: string | null;
+  audience_fit?: string | null;
+  content_pillar_fit?: string | null;
+  recommended_for?: string[];
+  approval_status: "draft" | "approved" | "archived";
+  notes?: string | null;
   created_at?: string;
   updated_at?: string;
 };

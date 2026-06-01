@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
-import { BarChart3, Brain, CalendarDays, CheckSquare, Clapperboard, Compass, FolderOpen, Home, Image, Plug, Settings, Sparkles, UserRound, WalletCards } from "lucide-react";
+import { BarChart3, Brain, CalendarDays, CheckSquare, Clapperboard, Compass, FolderOpen, Home, Image, LayoutTemplate, Plug, Settings, Sparkles, UserRound, WalletCards } from "lucide-react";
 import { AccountBadge } from "./AccountBadge";
 
 const nav = [
@@ -15,6 +15,7 @@ const nav = [
   { href: "/media-generator", label: "AI Media", icon: Image },
   { href: "/media-library", label: "Media Library", icon: FolderOpen },
   { href: "/approval-review", label: "Approval Review", icon: CheckSquare },
+  { href: "/canva-templates", label: "Canva Templates", icon: LayoutTemplate },
   { href: "/content-calendar", label: "Calendar", icon: CalendarDays },
   { href: "/scheduled-posts", label: "Scheduled", icon: Clapperboard },
   { href: "/social-accounts", label: "Social Accounts", icon: Plug },

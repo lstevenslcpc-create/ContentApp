@@ -146,15 +146,44 @@ create table if not exists content_packs (
   service_tie_in text,
   clinical_sensitivity text,
   design_status text default 'not_started',
+  canva_template_id uuid,
   pack jsonb default '{}'::jsonb,
   canva_brief jsonb default '{}'::jsonb,
   metadata jsonb default '{}'::jsonb,
   created_at timestamptz default now(),
   updated_at timestamptz default now(),
   constraint content_packs_status_check check (status in ('draft', 'needs_review', 'approved', 'scheduled', 'posted', 'failed')),
-  constraint content_packs_design_status_check check (design_status in ('not_started', 'ready_for_canva', 'designed_in_canva')),
+  constraint content_packs_design_status_check check (design_status in ('not_started', 'ready_for_canva', 'design_started', 'designed_in_canva')),
   constraint content_packs_clinical_sensitivity_check check (clinical_sensitivity is null or clinical_sensitivity in ('low', 'medium', 'high'))
 );
+
+create table if not exists canva_templates (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  template_name text not null,
+  canva_template_link text not null,
+  format_type text not null,
+  dimensions text,
+  aesthetic_vibe text,
+  color_palette text,
+  font_style text,
+  graphic_style text,
+  best_use_case text,
+  audience_fit text,
+  content_pillar_fit text,
+  recommended_for text[] default '{}',
+  approval_status text default 'draft',
+  notes text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  constraint canva_templates_approval_status_check check (approval_status in ('draft', 'approved', 'archived'))
+);
+
+create index if not exists canva_templates_user_status_idx
+on canva_templates(user_id, approval_status);
+
+create index if not exists canva_templates_format_type_idx
+on canva_templates(format_type);
 
 create table if not exists content_calendar_plans (
   id uuid primary key default gen_random_uuid(),
@@ -307,9 +336,25 @@ alter table content_packs add column if not exists product_tie_in text;
 alter table content_packs add column if not exists service_tie_in text;
 alter table content_packs add column if not exists clinical_sensitivity text;
 alter table content_packs add column if not exists design_status text default 'not_started';
+alter table content_packs add column if not exists canva_template_id uuid;
 alter table content_packs add column if not exists pack jsonb default '{}'::jsonb;
 alter table content_packs add column if not exists canva_brief jsonb default '{}'::jsonb;
 alter table content_packs add column if not exists metadata jsonb default '{}'::jsonb;
+alter table canva_templates add column if not exists user_id uuid references auth.users(id) on delete cascade;
+alter table canva_templates add column if not exists template_name text;
+alter table canva_templates add column if not exists canva_template_link text;
+alter table canva_templates add column if not exists format_type text;
+alter table canva_templates add column if not exists dimensions text;
+alter table canva_templates add column if not exists aesthetic_vibe text;
+alter table canva_templates add column if not exists color_palette text;
+alter table canva_templates add column if not exists font_style text;
+alter table canva_templates add column if not exists graphic_style text;
+alter table canva_templates add column if not exists best_use_case text;
+alter table canva_templates add column if not exists audience_fit text;
+alter table canva_templates add column if not exists content_pillar_fit text;
+alter table canva_templates add column if not exists recommended_for text[] default '{}';
+alter table canva_templates add column if not exists approval_status text default 'draft';
+alter table canva_templates add column if not exists notes text;
 alter table content_calendar_plans add column if not exists user_id uuid references auth.users(id) on delete cascade;
 alter table content_calendar_plans add column if not exists content_pack_id uuid references content_packs(id) on delete set null;
 alter table content_calendar_plans add column if not exists planned_date date;
@@ -362,6 +407,11 @@ create trigger content_packs_updated_at
 before update on content_packs
 for each row execute procedure set_updated_at();
 
+drop trigger if exists canva_templates_updated_at on canva_templates;
+create trigger canva_templates_updated_at
+before update on canva_templates
+for each row execute procedure set_updated_at();
+
 drop trigger if exists content_calendar_plans_updated_at on content_calendar_plans;
 create trigger content_calendar_plans_updated_at
 before update on content_calendar_plans
@@ -383,6 +433,7 @@ alter table generated_content enable row level security;
 alter table content_opportunities enable row level security;
 alter table media_library enable row level security;
 alter table content_packs enable row level security;
+alter table canva_templates enable row level security;
 alter table content_calendar_plans enable row level security;
 alter table content_calendar_focuses enable row level security;
 alter table social_accounts enable row level security;
@@ -422,6 +473,12 @@ with check (auth.uid() = user_id);
 drop policy if exists "Users can manage their content packs" on content_packs;
 create policy "Users can manage their content packs"
 on content_packs for all
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+drop policy if exists "Users can manage their canva templates" on canva_templates;
+create policy "Users can manage their canva templates"
+on canva_templates for all
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
 

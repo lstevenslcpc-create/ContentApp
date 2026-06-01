@@ -7,7 +7,7 @@ import type { ContentOpportunity, ContentPackBody, ContentStatus } from "@/lib/t
 export const runtime = "nodejs";
 
 const allowedStatuses: ContentStatus[] = ["draft", "needs_review", "approved", "scheduled", "posted", "failed"];
-const allowedDesignStatuses = ["not_started", "ready_for_canva", "designed_in_canva"];
+const allowedDesignStatuses = ["not_started", "ready_for_canva", "design_started", "designed_in_canva"];
 
 function errorMessage(error: unknown) {
   if (error instanceof Error) return error.message;
@@ -116,6 +116,10 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     if (body.canvaBrief && typeof body.canvaBrief === "object") {
       updates.canva_brief = body.canvaBrief;
+    }
+
+    if (body.canvaTemplateId === null || typeof body.canvaTemplateId === "string") {
+      updates.canva_template_id = body.canvaTemplateId;
     }
 
     if (body.metadata && typeof body.metadata === "object") {

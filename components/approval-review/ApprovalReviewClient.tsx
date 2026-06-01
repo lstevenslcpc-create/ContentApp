@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { CalendarPlus, CheckCircle2, Edit3, Loader2, Palette, RefreshCw, RotateCcw, Search, Send, Sparkles } from "lucide-react";
+import { CalendarPlus, CheckCircle2, Edit3, ExternalLink, Loader2, Palette, RefreshCw, RotateCcw, Search, Send, Sparkles } from "lucide-react";
 import { authedFetch } from "@/lib/apiClient";
 import { CopyButton } from "@/components/CopyButton";
-import type { ContentPack, ContentPackBody, ContentPackSectionKey, ContentStatus } from "@/lib/types";
+import type { CanvaTemplate, ContentPack, ContentPackBody, ContentPackSectionKey, ContentStatus } from "@/lib/types";
 
 const statuses: Array<ContentStatus | "all"> = ["all", "draft", "needs_review", "approved", "scheduled", "posted", "failed"];
 const platforms = ["all", "Instagram", "TikTok/Reels", "Pinterest", "Threads", "Blog", "Email", "Canva"];
@@ -57,7 +57,7 @@ function platformMatches(pack: ContentPack, platform: string) {
   return text.includes(needle.toLowerCase());
 }
 
-function canvaBrief(pack: ContentPack) {
+function canvaBrief(pack: ContentPack, template?: CanvaTemplate | null) {
   const body = pack.pack || {} as ContentPackBody;
   const carouselSlides = body.slide_by_slide_carousel_copy || body.instagram_carousel_outline || "";
   const pinterest = [body.pinterest_pin_title, body.pinterest_description].filter(Boolean).join("\n\n");
@@ -70,16 +70,22 @@ function canvaBrief(pack: ContentPack) {
     caption: body.instagram_caption || "",
     full: [
       `Title: ${pack.title}`,
+      `Approved Canva template: ${template?.template_name || "Choose an approved LionHeart template"}`,
+      template?.canva_template_link ? `Canva template link: ${template.canva_template_link}` : "",
       `Campaign: ${pack.content_pillar || "campaign focus"}`,
       `Instagram carousel slide text:\n${carouselSlides}`,
       `Pinterest pin text:\n${pinterest}`,
       `Reel/TikTok cover text:\n${coverText}`,
       `Canva design brief:\n${body.canva_visual_direction || "Create a calm LionHeart Therapy branded asset."}`,
       `Visual direction:\n${body.canva_visual_direction || ""}`,
-      `Color palette:\n${palette}`,
-      `Layout notes:\n${layoutNotes}`,
+      `Color palette:\n${template?.color_palette || palette}`,
+      `Font vibe:\n${template?.font_style || "clean editorial, readable, feminine-neutral"}`,
+      `Graphics:\n${template?.graphic_style || "minimal line accents, soft textures, grounded wellness imagery"}`,
+      `Image direction:\n${template?.best_use_case || body.canva_visual_direction || "realistic lifestyle or notebook-style therapy visuals"}`,
+      `Layout notes:\n${template?.notes || layoutNotes}`,
       `CTA placement:\n${body.product_cta || body.therapy_service_cta || "Place CTA on final slide and caption close."}`,
-      "@LHtherapy placement: lower corner or final slide footer, never competing with the main message."
+      "@LHtherapy placement: lower corner or final slide footer, never competing with the main message.",
+      "Avoid: generic AI stock imagery, neon gradients, cluttered text, guru-style wellness language, and off-brand color palettes."
     ].join("\n\n"),
     coverText,
     palette,
@@ -92,17 +98,26 @@ function designStatus(pack: ContentPack) {
   return pack.design_status || metadataStatus || "not_started";
 }
 
-function metadataWithCanva(pack: ContentPack, status: "ready_for_canva" | "designed_in_canva") {
+function metadataString(pack: ContentPack, key: string) {
+  return pack.metadata && typeof pack.metadata[key] === "string" ? String(pack.metadata[key]) : "";
+}
+
+function metadataWithCanva(pack: ContentPack, status: "ready_for_canva" | "design_started" | "designed_in_canva", template?: CanvaTemplate | null) {
   return {
     ...(pack.metadata || {}),
     canvaPrepStatus: status,
-    canvaBrief: canvaBrief(pack),
+    canvaBrief: canvaBrief(pack, template),
+    selectedCanvaTemplateId: template?.id || metadataString(pack, "selectedCanvaTemplateId") || null,
+    selectedCanvaTemplateName: template?.template_name || metadataString(pack, "selectedCanvaTemplateName") || null,
+    selectedCanvaTemplateLink: template?.canva_template_link || metadataString(pack, "selectedCanvaTemplateLink") || null,
     canvaPrepUpdatedAt: new Date().toISOString()
   };
 }
 
 export function ApprovalReviewClient() {
   const [packs, setPacks] = useState<ContentPack[]>([]);
+  const [templates, setTemplates] = useState<CanvaTemplate[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [filters, setFilters] = useState<Filters>({ status: "all", platform: "all", campaign: "all", date: "", cta: "all", query: "" });
   const [selectedId, setSelectedId] = useState("");
   const [scheduleDate, setScheduleDate] = useState(new Date().toISOString().slice(0, 10));
@@ -126,8 +141,19 @@ export function ApprovalReviewClient() {
     setSelectedId((current) => current || nextPacks[0]?.id || "");
   }
 
+  async function loadTemplates() {
+    const response = await authedFetch("/api/canva-templates?status=approved");
+    const data = await readApiResponse(response);
+    if (response.ok) {
+      const nextTemplates = Array.isArray(data.templates) ? data.templates as CanvaTemplate[] : [];
+      setTemplates(nextTemplates);
+      setSelectedTemplateId((current) => current || nextTemplates[0]?.id || "");
+    }
+  }
+
   useEffect(() => {
     void loadPacks();
+    void loadTemplates();
   }, []);
 
   const filtered = useMemo(() => packs.filter((pack) => {
@@ -146,7 +172,8 @@ export function ApprovalReviewClient() {
   }), [filters, packs]);
 
   const selected = filtered.find((pack) => pack.id === selectedId) || filtered[0] || packs.find((pack) => pack.id === selectedId) || null;
-  const brief = selected ? canvaBrief(selected) : null;
+  const selectedTemplate = templates.find((template) => template.id === selectedTemplateId) || (selected ? templates.find((template) => template.id === metadataString(selected, "selectedCanvaTemplateId")) : null) || null;
+  const brief = selected ? canvaBrief(selected, selectedTemplate) : null;
 
   async function patchPack(packId: string, updates: Record<string, unknown>, success: string) {
     setBusy(`${packId}:${JSON.stringify(updates)}`);
@@ -268,8 +295,9 @@ export function ApprovalReviewClient() {
               onApprove={() => patchPack(pack.id, { status: "approved" }, "Content pack approved.")}
               onDraft={() => patchPack(pack.id, { status: "draft" }, "Content pack sent back to draft.")}
               onNeedsReview={() => patchPack(pack.id, { status: "needs_review" }, "Content pack marked needs review.")}
-              onCanva={() => patchPack(pack.id, { metadata: metadataWithCanva(pack, "ready_for_canva") }, "Content pack sent to Canva Prep.")}
-              onDesigned={() => patchPack(pack.id, { metadata: metadataWithCanva(pack, "designed_in_canva") }, "Marked as designed in Canva.")}
+              onCanva={() => patchPack(pack.id, { metadata: metadataWithCanva(pack, "ready_for_canva", selectedTemplate) }, "Content pack sent to Canva Prep.")}
+              onDesignStarted={() => patchPack(pack.id, { metadata: metadataWithCanva(pack, "design_started", selectedTemplate) }, "Design marked started.")}
+              onDesigned={() => patchPack(pack.id, { metadata: metadataWithCanva(pack, "designed_in_canva", selectedTemplate) }, "Marked as designed in Canva.")}
               scheduleDate={scheduleDate}
               setScheduleDate={setScheduleDate}
               onSchedule={() => schedule(pack)}
@@ -294,7 +322,16 @@ export function ApprovalReviewClient() {
               </div>
 
               <div className="mt-4 grid gap-2">
+                <label>
+                  <span className="label">Choose approved Canva template</span>
+                  <select className="field mt-1" value={selectedTemplateId} onChange={(event) => setSelectedTemplateId(event.target.value)}>
+                    <option value="">No approved template selected</option>
+                    {templates.map((template) => <option key={template.id} value={template.id}>{template.template_name} · {template.format_type}</option>)}
+                  </select>
+                </label>
+                {selectedTemplate?.canva_template_link && <a className="btn-secondary" href={selectedTemplate.canva_template_link} target="_blank" rel="noreferrer"><ExternalLink size={16} />Open Canva Template</a>}
                 <CopyButton text={brief.full} label="Copy Full Canva Brief" />
+                <CopyButton text={brief.full} label="Copy Canva Prompt" />
                 <CopyButton text={brief.carouselSlides} label="Copy Carousel Slides" />
                 <CopyButton text={brief.pinterest} label="Copy Pinterest Details" />
                 <CopyButton text={brief.caption} label="Copy Caption" />
@@ -305,6 +342,7 @@ export function ApprovalReviewClient() {
               <PrepBlock title="Reel/TikTok cover text" value={brief.coverText} />
               <PrepBlock title="Canva design brief" value={selected.pack.canva_visual_direction || "Create a calm LionHeart Therapy branded visual."} />
               <PrepBlock title="Color palette" value={brief.palette} />
+              <PrepBlock title="Approved template" value={selectedTemplate ? `${selectedTemplate.template_name}\n${selectedTemplate.format_type}\n${selectedTemplate.canva_template_link}` : "Choose an approved Canva template from the library."} />
               <PrepBlock title="Layout notes" value={brief.layoutNotes} />
               <PrepBlock title="CTA placement" value={selected.pack.product_cta || selected.pack.therapy_service_cta || "Final slide and caption close."} />
               <PrepBlock title="@LHtherapy placement" value="Lower corner or final slide footer, visible but subtle." />
@@ -340,7 +378,7 @@ function FilterSelect({ label, value, onChange, options }: { label: string; valu
   );
 }
 
-function PackReviewCard({ pack, selected, busy, onSelect, onApprove, onDraft, onNeedsReview, onCanva, onDesigned, scheduleDate, setScheduleDate, onSchedule }: {
+function PackReviewCard({ pack, selected, busy, onSelect, onApprove, onDraft, onNeedsReview, onCanva, onDesignStarted, onDesigned, scheduleDate, setScheduleDate, onSchedule }: {
   pack: ContentPack;
   selected: boolean;
   busy: boolean;
@@ -349,6 +387,7 @@ function PackReviewCard({ pack, selected, busy, onSelect, onApprove, onDraft, on
   onDraft: () => void;
   onNeedsReview: () => void;
   onCanva: () => void;
+  onDesignStarted: () => void;
   onDesigned: () => void;
   scheduleDate: string;
   setScheduleDate: (value: string) => void;
@@ -382,6 +421,7 @@ function PackReviewCard({ pack, selected, busy, onSelect, onApprove, onDraft, on
           <input className="field mt-1" type="date" value={scheduleDate} onChange={(event) => setScheduleDate(event.target.value)} />
         </label>
         <button className="btn-secondary" onClick={onSchedule} disabled={busy}><CalendarPlus size={16} />Schedule</button>
+        <button className="btn-secondary" onClick={onDesignStarted} disabled={busy}><Palette size={16} />Mark Design Started</button>
         <button className="btn-secondary border-[#d8c28a] text-[#77633c]" onClick={onDesigned} disabled={busy}><Palette size={16} />Mark Designed</button>
       </div>
     </article>
@@ -407,6 +447,7 @@ function StatusBadge({ status }: { status: string }) {
     failed: "bg-rose-50 text-rose-700",
     not_started: "bg-slate-100 text-slate-600",
     ready_for_canva: "bg-[#eee8fb] text-[#4d3a7a]",
+    design_started: "bg-[#fff4d8] text-[#8a6926]",
     designed_in_canva: "bg-[#eef3ec] text-[#4f6f5a]"
   };
   return <span className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide ${styles[status] || styles.draft}`}>{status.replaceAll("_", " ")}</span>;
