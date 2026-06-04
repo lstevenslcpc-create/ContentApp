@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { CalendarPlus, CheckCircle2, Edit3, ExternalLink, Loader2, Palette, RefreshCw, RotateCcw, Search, Send, Sparkles } from "lucide-react";
+import { CalendarPlus, CheckCircle2, Download, Edit3, ExternalLink, Loader2, Palette, RefreshCw, RotateCcw, Search, Send, Sparkles } from "lucide-react";
 import { authedFetch } from "@/lib/apiClient";
 import { CANVA_TEMPLATES, type CanvaTemplateRegistryItem } from "@/lib/canvaTemplates";
 import { CopyButton } from "@/components/CopyButton";
@@ -286,6 +286,60 @@ function formatSlideCopyFields(fields: Array<{ label: string; value: string }>) 
     .join("\n\n");
 }
 
+function inferPlatform(pack: ContentPack, template?: CanvaTemplate | null) {
+  const text = packMatchingContext(pack);
+  if (text.includes("instagram") || normalizeText(template?.format_type).includes("carousel")) return "Instagram Carousel";
+  if (text.includes("tiktok") || text.includes("reel")) return "TikTok/Reels";
+  if (text.includes("pinterest") || normalizeText(template?.format_type).includes("pinterest")) return "Pinterest";
+  if (text.includes("blog")) return "Blog";
+  if (text.includes("email") || text.includes("newsletter")) return "Email";
+  return template?.format_type || "Canva";
+}
+
+function extractHashtags(caption: string) {
+  return Array.from(new Set(caption.match(/#[\w-]+/g) || []));
+}
+
+function canvaExportPackage(pack: ContentPack, template: CanvaTemplate | null, match: CanvaTemplateMatch | null | undefined, fields: Array<{ key: string; value: string }>) {
+  const caption = pack.pack.instagram_caption || "";
+  const cta = pack.pack.product_cta || pack.pack.therapy_service_cta || "";
+  const fieldMap = fields.reduce<Record<string, string>>((mappedFields, field) => {
+    mappedFields[field.key] = field.value;
+    return mappedFields;
+  }, {});
+  return {
+    contentPackId: pack.id,
+    templateName: template?.template_name || null,
+    templateType: template?.format_type || null,
+    canvaLink: template?.canva_template_link || null,
+    matchScore: match?.score || metadataNumber(pack, "canvaTemplateMatchScore") || null,
+    matchReason: match?.reason || metadataString(pack, "canvaTemplateMatchReason") || null,
+    fields: fieldMap,
+    slideOrder: fields.map((field) => field.key),
+    platform: inferPlatform(pack, template),
+    campaign: pack.content_pillar || pack.source_topic || pack.title,
+    caption,
+    hashtags: extractHashtags(caption),
+    CTA: cta
+  };
+}
+
+function stringifyCanvaPackage(exportPackage: Record<string, unknown>) {
+  return JSON.stringify(exportPackage, null, 2);
+}
+
+function downloadJson(filename: string, payload: string) {
+  const blob = new Blob([payload], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 function platformMatches(pack: ContentPack, platform: string) {
   if (platform === "all") return true;
   const text = packText(pack);
@@ -435,6 +489,8 @@ export function ApprovalReviewClient() {
   const savedFillPackage = selected && metadataString(selected, "selectedCanvaTemplateId") === selectedTemplate?.id && metadataNumber(selected, "canvaFillPackageVersion") >= 2 ? metadataRecord(selected, "canvaFillPackage") : {};
   const visibleFillPackage = Object.keys(savedFillPackage).length ? savedFillPackage : fillPackage;
   const templatePreview = templatePreviewFields(selectedTemplate, visibleFillPackage);
+  const exportPackage = selected ? canvaExportPackage(selected, selectedTemplate, selectedTemplateMatch, templatePreview) : null;
+  const exportPackageJson = exportPackage ? stringifyCanvaPackage(exportPackage) : "";
 
   useEffect(() => {
     if (!selected || !templates.length) return;
@@ -653,6 +709,7 @@ export function ApprovalReviewClient() {
 
               <TemplatePreviewCard template={selectedTemplate} fields={templatePreview} />
               <CanvaSlideCopyCenter fields={templatePreview} />
+              {selected && exportPackage ? <CanvaExportPackageCard pack={selected} json={exportPackageJson} /> : null}
               <PrepBlock title="Instagram carousel slide text" value={brief.carouselSlides} />
               <PrepBlock title="Pinterest pin text" value={brief.pinterest} />
               <PrepBlock title="Reel/TikTok cover text" value={brief.coverText} />
@@ -812,6 +869,33 @@ function CanvaSlideCopyCenter({ fields }: { fields: Array<{ key: string; label: 
           </article>
         ))}
       </div>
+    </div>
+  );
+}
+
+function CanvaExportPackageCard({ pack, json }: { pack: ContentPack; json: string }) {
+  const filename = `${pack.title || "canva-export-package"}`
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 70) || "canva-export-package";
+
+  return (
+    <div className="mt-4 rounded-2xl bg-[#f8f5ee] p-4 ring-1 ring-[#d8c28a]">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-[#77633c]">Canva Export Package</p>
+          <h3 className="mt-1 text-lg font-bold text-[#172a3a]">Structured JSON for Canva autofill</h3>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <CopyButton text={json} label="Copy Canva Package JSON" />
+          <button className="btn-secondary" type="button" onClick={() => downloadJson(`${filename}.json`, json)}>
+            <Download size={16} />
+            Download Canva Package JSON
+          </button>
+        </div>
+      </div>
+      <pre className="mt-4 max-h-80 overflow-auto rounded-2xl bg-[#172a3a] p-4 text-xs leading-5 text-[#f8f5ee]">{json}</pre>
     </div>
   );
 }
