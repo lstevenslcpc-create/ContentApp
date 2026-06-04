@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Archive, CheckCircle2, ExternalLink, LayoutTemplate, Loader2, Pencil, Plus } from "lucide-react";
+import { Archive, CheckCircle2, ExternalLink, LayoutTemplate, Loader2, Pencil, Plus, Sparkles } from "lucide-react";
 import { authedFetch } from "@/lib/apiClient";
+import { CANVA_TEMPLATES } from "@/lib/canvaTemplates";
 import type { CanvaTemplate } from "@/lib/types";
 
 const formatTypes = ["Instagram carousel", "Pinterest pin", "Reel cover", "Story", "Workbook promo", "Blog graphic", "Quote post"];
@@ -104,6 +105,27 @@ export function CanvaTemplatesClient() {
     setTemplates((current) => current.map((item) => item.id === template.id ? data.template as CanvaTemplate : item));
   }
 
+  async function importStarterTemplates() {
+    setBusy("import-starters");
+    setMessage("");
+    const response = await authedFetch("/api/canva-templates/import-starters", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" }
+    });
+    const data = await readApiResponse(response);
+    setBusy("");
+    if (!response.ok) {
+      setMessage(typeof data.error === "string" ? data.error : "Unable to import starter templates.");
+      return;
+    }
+    const importedTemplates = Array.isArray(data.templates) ? data.templates as CanvaTemplate[] : [];
+    setTemplates((current) => {
+      const importedIds = new Set(importedTemplates.map((template) => template.id));
+      return [...importedTemplates, ...current.filter((template) => !importedIds.has(template.id))];
+    });
+    setMessage(typeof data.message === "string" ? data.message : "Starter templates imported.");
+  }
+
   function edit(template: CanvaTemplate) {
     setEditingId(template.id);
     setForm({
@@ -162,10 +184,31 @@ export function CanvaTemplatesClient() {
         </form>
 
         <div className="space-y-4">
+          <div className="rounded-3xl border border-[#e9dfcf] bg-[#fffbf5] p-4 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="inline-flex items-center gap-2 rounded-full bg-[#eee8fb] px-3 py-1 text-xs font-bold text-[#4d3a7a]">
+                  <Sparkles size={14} />
+                  Starter registry
+                </p>
+                <h2 className="mt-3 text-xl font-bold text-[#172a3a]">Import the 7 approved LionHeart templates.</h2>
+                <p className="mt-1 max-w-2xl text-sm leading-6 text-[#6f766f]">Adds the approved Canva links, recommended uses, audiences, pillars, and template field notes. Existing templates are skipped automatically.</p>
+              </div>
+              <button className="btn-primary bg-[#8f79d6] px-5 py-3 hover:bg-[#7e68c7]" onClick={() => void importStarterTemplates()} disabled={Boolean(busy)}>
+                {busy === "import-starters" ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} />}
+                Import Approved Starter Templates
+              </button>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {CANVA_TEMPLATES.map((template) => (
+                <span key={template.id} className="rounded-full bg-white px-3 py-1 text-xs font-bold text-[#77633c] shadow-sm">{template.name}</span>
+              ))}
+            </div>
+          </div>
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-[#e9dfcf] bg-white p-4 shadow-sm">
             <div>
               <h2 className="text-xl font-bold text-[#172a3a]">Template Cards</h2>
-              <p className="mt-1 text-sm text-[#6f766f]">Only approved templates are recommended to Content Packs by default.</p>
+              <p className="mt-1 text-sm text-[#6f766f]">Only approved templates are recommended to Content Packs by default. Starter registry: {CANVA_TEMPLATES.length} templates.</p>
             </div>
             <select className="field w-auto" value={filter} onChange={(event) => setFilter(event.target.value)}>
               {["all", "draft", "approved", "archived"].map((item) => <option key={item}>{item}</option>)}
