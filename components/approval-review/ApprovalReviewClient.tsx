@@ -168,6 +168,37 @@ function sentence(value: string, fallback: string) {
   return (match?.[0] || fallback).trim();
 }
 
+function isAnxiousAttachmentPack(pack: ContentPack) {
+  return packMatchingContext(pack).includes("anxious attachment");
+}
+
+function emotionalHookCarouselFillPackage(pack: ContentPack, cta: string) {
+  if (isAnxiousAttachmentPack(pack)) {
+    return {
+      slide1_hook: "When their tone changes and your whole body starts looking for what went wrong",
+      slide1_subhook: "An anxious attachment response can feel like panic before you even know what you are afraid of.",
+      slide2_recognition: "You might reread the text.\nReplay the conversation.\nCheck their face.\nTry to fix the mood before anyone says there is a problem.",
+      slide3_nervous_system_explanation: "Your nervous system is not being dramatic.\nIt may be scanning for distance, rejection, or emotional danger based on what felt unsafe before.",
+      slide4_examples: "It can sound like:\n\"Are they mad at me?\"\n\"Did I say too much?\"\n\"Why do they feel different?\"\n\"I need to make this okay right now.\"",
+      slide5_reframe: "The trigger is not proof that you are too needy.\nIt is information: something in you is asking for steadiness, clarity, and reassurance.",
+      slide6_healing_message: "You can learn to pause before pursuing.\nName the fear underneath the urgency.\nAsk for connection without abandoning yourself.",
+      slide7_cta: cta || "Save this for the next time a small shift feels bigger than it should."
+    };
+  }
+
+  const topic = pack.title || "the emotional pattern you keep minimizing";
+  return {
+    slide1_hook: topic,
+    slide1_subhook: "If this feels personal, it may be because your body recognized the pattern before your mind had words for it.",
+    slide2_recognition: "You may look calm on the outside while quietly managing fear, pressure, resentment, or overwhelm on the inside.",
+    slide3_nervous_system_explanation: "Your nervous system can turn old emotional patterns into automatic responses: overexplaining, shutting down, people pleasing, or bracing for conflict.",
+    slide4_examples: "It can look like:\nchecking for tone shifts\napologizing too quickly\nsaying yes when you mean no\nfeeling exhausted after normal conversations",
+    slide5_reframe: "This is not a character flaw.\nIt is a signal that something in your emotional system has been working too hard for too long.",
+    slide6_healing_message: "Support can help you notice the pattern sooner, respond with more choice, and build language for what you actually need.",
+    slide7_cta: cta || "Save this as a gentle reminder to notice the pattern, not shame yourself for having it."
+  };
+}
+
 function canvaFillPackage(pack: ContentPack, template?: CanvaTemplate | null) {
   const registry = registryForTemplate(template);
   const body = pack.pack || {} as ContentPackBody;
@@ -178,16 +209,7 @@ function canvaFillPackage(pack: ContentPack, template?: CanvaTemplate | null) {
   const visual = body.canva_visual_direction || "Use a calm LionHeart Therapy visual style with soft cream, sage, muted navy, and emotionally grounded spacing.";
 
   if (registry?.id === "emotional-hook-carousel") {
-    return {
-      slide1_hook: cleanLine(body.instagram_carousel_outline || title, title),
-      slide1_subhook: sentence(caption, "The part nobody sees is often the part that feels the loudest."),
-      slide2_recognition: sentence(carousel, "This can look like reading into tone shifts, delayed replies, or small changes in closeness."),
-      slide3_nervous_system_explanation: sentence(body.tiktok_reels_script || carousel, "Your nervous system may be scanning for disconnection before your mind has words for it."),
-      slide4_examples: carousel || "Examples: rereading texts, apologizing too quickly, assuming distance means rejection, or feeling unsettled after a tiny tone change.",
-      slide5_reframe: "This is not you being too much. It may be your attachment system trying to protect you from feeling blindsided.",
-      slide6_healing_message: "Support can help you notice the trigger, name the fear underneath it, and respond with more steadiness.",
-      slide7_cta: cta
-    };
+    return emotionalHookCarouselFillPackage(pack, cta);
   }
 
   const values: Record<string, string> = {
@@ -323,6 +345,7 @@ function metadataWithCanva(pack: ContentPack, status: "ready_for_canva" | "desig
     canvaTemplateMatchReason: activeMatch?.reason || null,
     canvaTemplateRegistryId: activeMatch?.registry?.id || null,
     canvaFillPackage: fillPackage,
+    canvaFillPackageVersion: 2,
     canvaPrepUpdatedAt: new Date().toISOString()
   };
 }
@@ -390,7 +413,7 @@ export function ApprovalReviewClient() {
   const selectedTemplateMatch = selected && selectedTemplate ? scoreTemplateForPack(selected, selectedTemplate) : recommendedMatch;
   const brief = selected ? canvaBrief(selected, selectedTemplate) : null;
   const fillPackage = selected && selectedTemplate ? canvaFillPackage(selected, selectedTemplate) : {};
-  const savedFillPackage = selected && metadataString(selected, "selectedCanvaTemplateId") === selectedTemplate?.id ? metadataRecord(selected, "canvaFillPackage") : {};
+  const savedFillPackage = selected && metadataString(selected, "selectedCanvaTemplateId") === selectedTemplate?.id && metadataNumber(selected, "canvaFillPackageVersion") >= 2 ? metadataRecord(selected, "canvaFillPackage") : {};
   const visibleFillPackage = Object.keys(savedFillPackage).length ? savedFillPackage : fillPackage;
 
   useEffect(() => {
