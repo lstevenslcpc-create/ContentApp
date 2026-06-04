@@ -287,6 +287,26 @@ function slideEntriesFromFillPackage(fillPackage: Record<string, string>) {
   }));
 }
 
+function fieldLabel(field: string) {
+  return field
+    .split("_")
+    .map((word) => /^\d+$/.test(word) ? word : word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ")
+    .replace(/^Slide(\d+)/, "Slide $1")
+    .replace("Cta", "CTA")
+    .replace("Seo", "SEO");
+}
+
+function templatePreviewFields(template: CanvaTemplate | null, fillPackage: Record<string, string>) {
+  const registry = registryForTemplate(template);
+  const fields = registry?.fields?.length ? registry.fields : Object.keys(fillPackage);
+  return fields.map((field) => ({
+    key: field,
+    label: fieldLabel(field),
+    value: fillPackage[field] || ""
+  }));
+}
+
 function platformMatches(pack: ContentPack, platform: string) {
   if (platform === "all") return true;
   const text = packText(pack);
@@ -435,6 +455,7 @@ export function ApprovalReviewClient() {
   const fillPackage = selected && selectedTemplate ? canvaFillPackage(selected, selectedTemplate) : {};
   const savedFillPackage = selected && metadataString(selected, "selectedCanvaTemplateId") === selectedTemplate?.id && metadataNumber(selected, "canvaFillPackageVersion") >= 2 ? metadataRecord(selected, "canvaFillPackage") : {};
   const visibleFillPackage = Object.keys(savedFillPackage).length ? savedFillPackage : fillPackage;
+  const templatePreview = templatePreviewFields(selectedTemplate, visibleFillPackage);
 
   useEffect(() => {
     if (!selected || !templates.length) return;
@@ -651,6 +672,7 @@ export function ApprovalReviewClient() {
                 <CopyButton text={brief.caption} label="Copy Caption" />
               </div>
 
+              <TemplatePreviewCard template={selectedTemplate} fields={templatePreview} />
               <SlideFillPackage slides={slideEntriesFromFillPackage(visibleFillPackage)} />
               <PrepBlock title="Instagram carousel slide text" value={brief.carouselSlides} />
               <PrepBlock title="Pinterest pin text" value={brief.pinterest} />
@@ -748,6 +770,41 @@ function PrepBlock({ title, value }: { title: string; value: string }) {
     <div className="mt-4 rounded-2xl bg-[#fffdf8] p-4 ring-1 ring-[#eadfc8]">
       <p className="text-xs font-bold uppercase tracking-wide text-[#77633c]">{title}</p>
       <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[#20313f]">{value || "Not provided yet."}</p>
+    </div>
+  );
+}
+
+function TemplatePreviewCard({ template, fields }: { template: CanvaTemplate | null; fields: Array<{ key: string; label: string; value: string }> }) {
+  return (
+    <div className="mt-4 rounded-2xl bg-[#f8f5ee] p-4 ring-1 ring-[#d8c28a]">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-[#77633c]">Template Preview</p>
+          <h3 className="mt-1 text-xl font-bold text-[#172a3a]">{template?.template_name || "Choose an approved Canva template"}</h3>
+          {template?.canva_template_link ? (
+            <a className="mt-2 inline-flex items-center gap-2 text-sm font-bold text-[#4d3a7a] underline-offset-4 hover:underline" href={template.canva_template_link} target="_blank" rel="noreferrer">
+              <ExternalLink size={14} />
+              Canva Link
+            </a>
+          ) : null}
+        </div>
+        <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-[#77633c] shadow-sm">{fields.length} fields required</span>
+      </div>
+
+      <div className="mt-4">
+        <p className="text-xs font-bold uppercase tracking-wide text-[#77633c]">Fields Required</p>
+        <div className="mt-3 grid gap-3">
+          {fields.map((field) => (
+            <div key={field.key} className="grid gap-2 rounded-2xl border border-[#eadfc8] bg-white p-3 md:grid-cols-[145px_1fr]">
+              <div>
+                <p className="text-sm font-bold text-[#172a3a]">{field.label}</p>
+                <p className="mt-1 text-[11px] font-semibold text-[#8b9189]">{field.key}</p>
+              </div>
+              <p className="whitespace-pre-wrap text-sm leading-6 text-[#20313f]">{field.value || "Generated content will appear here."}</p>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
