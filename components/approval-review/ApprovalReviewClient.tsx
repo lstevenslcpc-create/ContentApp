@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { CalendarPlus, CheckCircle2, Edit3, ExternalLink, Loader2, Palette, RefreshCw, RotateCcw, Search, Send, Sparkles } from "lucide-react";
 import { authedFetch } from "@/lib/apiClient";
+import { CANVA_TEMPLATES, type CanvaTemplateRegistryItem } from "@/lib/canvaTemplates";
 import { CopyButton } from "@/components/CopyButton";
 import type { CanvaTemplate, ContentPack, ContentPackBody, ContentPackSectionKey, ContentStatus } from "@/lib/types";
 
@@ -35,6 +36,13 @@ type Filters = {
   query: string;
 };
 
+type CanvaTemplateMatch = {
+  template: CanvaTemplate;
+  registry?: CanvaTemplateRegistryItem;
+  score: number;
+  reason: string;
+};
+
 async function readApiResponse(response: Response) {
   const text = await response.text();
   if (!text) return {};
@@ -47,6 +55,194 @@ async function readApiResponse(response: Response) {
 
 function packText(pack: ContentPack) {
   return Object.values(pack.pack || {}).join("\n").toLowerCase();
+}
+
+function normalizeText(value: unknown) {
+  return String(value || "").toLowerCase();
+}
+
+function splitList(value: string | null | undefined) {
+  return normalizeText(value)
+    .split(/[,·\n]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function registryForTemplate(template?: CanvaTemplate | null) {
+  if (!template) return undefined;
+  const name = normalizeText(template.template_name);
+  const url = normalizeText(template.canva_template_link);
+  return CANVA_TEMPLATES.find((item) => normalizeText(item.template_url) === url || normalizeText(item.name) === name);
+}
+
+function packMatchingContext(pack: ContentPack) {
+  return [
+    pack.title,
+    pack.source_topic,
+    pack.audience,
+    pack.content_pillar,
+    pack.product_tie_in,
+    pack.service_tie_in,
+    pack.clinical_sensitivity,
+    pack.pack.instagram_carousel_outline,
+    pack.pack.slide_by_slide_carousel_copy,
+    pack.pack.instagram_caption,
+    pack.pack.pinterest_pin_title,
+    pack.pack.pinterest_description,
+    pack.pack.tiktok_reels_script,
+    pack.pack.canva_visual_direction,
+    pack.pack.product_cta,
+    pack.pack.therapy_service_cta
+  ].join(" ").toLowerCase();
+}
+
+function countMatches(context: string, values: string[] | undefined, weight: number) {
+  return (values || []).reduce((score, value) => score + (context.includes(normalizeText(value)) ? weight : 0), 0);
+}
+
+function scoreTemplateForPack(pack: ContentPack, template: CanvaTemplate): CanvaTemplateMatch {
+  const registry = registryForTemplate(template);
+  const context = packMatchingContext(pack);
+  const recommended = splitList((template.recommended_for || []).join(","));
+  const audience = splitList(template.audience_fit);
+  const pillars = splitList(template.content_pillar_fit);
+  const useCases = splitList(template.best_use_case);
+  let score = 34;
+  const reasons: string[] = [];
+
+  const bestForScore = countMatches(context, registry?.best_for || recommended, 16);
+  if (bestForScore) reasons.push("matches the topic and campaign language");
+  score += bestForScore;
+
+  const audienceScore = countMatches(context, registry?.audience || audience, 8);
+  if (audienceScore) reasons.push("fits the intended audience");
+  score += audienceScore;
+
+  const pillarScore = countMatches(context, registry?.content_pillars || pillars, 9);
+  if (pillarScore) reasons.push("supports this content pillar");
+  score += pillarScore;
+
+  const useCaseScore = countMatches(context, useCases, 7);
+  if (useCaseScore) reasons.push("aligns with the product or service CTA");
+  score += useCaseScore;
+
+  if (context.includes("anxious attachment") && normalizeText(template.template_name).includes("emotional hook")) {
+    score += 26;
+    reasons.unshift("is designed for emotionally specific anxious attachment recognition");
+  }
+  if ((context.includes("teen") || context.includes("school")) && normalizeText(template.template_name).includes("teen")) score += 24;
+  if ((context.includes("pinterest") || context.includes("seo")) && normalizeText(template.format_type).includes("pinterest")) score += 20;
+  if ((context.includes("blog") || context.includes("website")) && normalizeText(template.template_name).includes("blog")) score += 20;
+  if ((context.includes("reel") || context.includes("tiktok") || context.includes("video")) && normalizeText(template.format_type).includes("reel")) score += 20;
+  if ((context.includes("workbook") || context.includes("journal") || context.includes("coloring book")) && normalizeText(template.template_name).includes("workbook")) score += 22;
+  if (normalizeText(template.approval_status) === "approved") score += 5;
+
+  const finalScore = Math.max(0, Math.min(98, Math.round(score)));
+  return {
+    template,
+    registry,
+    score: finalScore,
+    reason: reasons.length
+      ? `Chosen because this template ${Array.from(new Set(reasons)).join(", ")}.`
+      : "Chosen because it is an approved LionHeart template with the closest fit to this pack."
+  };
+}
+
+function bestTemplateMatch(pack: ContentPack, templates: CanvaTemplate[]) {
+  if (!templates.length) return null;
+  return templates
+    .map((template) => scoreTemplateForPack(pack, template))
+    .sort((a, b) => b.score - a.score)[0];
+}
+
+function cleanLine(value: string, fallback: string) {
+  const line = value
+    .split("\n")
+    .map((item) => item.replace(/^[-*\d.\s]+/, "").trim())
+    .find(Boolean);
+  return line || fallback;
+}
+
+function sentence(value: string, fallback: string) {
+  const match = value.match(/[^.!?\n]+[.!?]?/);
+  return (match?.[0] || fallback).trim();
+}
+
+function canvaFillPackage(pack: ContentPack, template?: CanvaTemplate | null) {
+  const registry = registryForTemplate(template);
+  const body = pack.pack || {} as ContentPackBody;
+  const title = pack.title;
+  const carousel = body.slide_by_slide_carousel_copy || body.instagram_carousel_outline || "";
+  const caption = body.instagram_caption || "";
+  const cta = body.product_cta || body.therapy_service_cta || "Save this for later, and reach out when you are ready for support.";
+  const visual = body.canva_visual_direction || "Use a calm LionHeart Therapy visual style with soft cream, sage, muted navy, and emotionally grounded spacing.";
+
+  if (registry?.id === "emotional-hook-carousel") {
+    return {
+      slide1_hook: cleanLine(body.instagram_carousel_outline || title, title),
+      slide1_subhook: sentence(caption, "The part nobody sees is often the part that feels the loudest."),
+      slide2_recognition: sentence(carousel, "This can look like reading into tone shifts, delayed replies, or small changes in closeness."),
+      slide3_nervous_system_explanation: sentence(body.tiktok_reels_script || carousel, "Your nervous system may be scanning for disconnection before your mind has words for it."),
+      slide4_examples: carousel || "Examples: rereading texts, apologizing too quickly, assuming distance means rejection, or feeling unsettled after a tiny tone change.",
+      slide5_reframe: "This is not you being too much. It may be your attachment system trying to protect you from feeling blindsided.",
+      slide6_healing_message: "Support can help you notice the trigger, name the fear underneath it, and respond with more steadiness.",
+      slide7_cta: cta
+    };
+  }
+
+  const values: Record<string, string> = {
+    title,
+    hook: cleanLine(body.instagram_carousel_outline || body.tiktok_reels_script || title, title),
+    subtitle: sentence(caption, "A LionHeart Therapy resource for emotionally specific support."),
+    visual_direction: visual,
+    cta,
+    product_cta: body.product_cta || cta,
+    therapy_cta: body.therapy_service_cta || cta,
+    pinterest_title: body.pinterest_pin_title || title,
+    pinterest_description: body.pinterest_description || caption,
+    caption,
+    carousel_slides: carousel,
+    cover_hook: cleanLine(body.tiktok_reels_script || title, title),
+    cover_subhook: sentence(body.tiktok_reels_script || caption, "A therapist POV for the moment you cannot quite explain."),
+    video_series_label: pack.content_pillar || "Therapist POV",
+    therapist_pov_line: sentence(body.tiktok_reels_script || caption, "If this feels familiar, your body may be trying to keep you safe."),
+    visual_mood: visual,
+    cta_microcopy: cta,
+    pin_title: body.pinterest_pin_title || title,
+    pin_subtitle: sentence(body.pinterest_description || caption, "Save this for later."),
+    seo_title: body.pinterest_pin_title || title,
+    seo_subtitle: sentence(body.pinterest_description || caption, "Therapist-written insight for real-life mental health questions."),
+    blog_category: pack.content_pillar || "Therapy Education",
+    key_question: title,
+    three_takeaways: body.blog_outline || carousel || caption,
+    service_or_product_tie_in: [pack.product_tie_in, pack.service_tie_in].filter(Boolean).join(" · ") || cta,
+    website_cta: cta,
+    product_name: pack.product_tie_in || "LionHeart Therapy resource",
+    product_hook: cleanLine(body.product_cta || title, title),
+    pain_point: sentence(caption || carousel, "Feeling overwhelmed, anxious, or unsure where to start."),
+    transformation_outcome: "More language, clarity, and grounded next steps.",
+    inside_the_product: body.product_cta || "Practical prompts, reflection support, and emotionally specific guidance.",
+    best_for: pack.audience || "LionHeart Therapy audience",
+    seasonal_angle: pack.content_pillar || "evergreen mental health support"
+  };
+
+  return (registry?.fields || ["hook", "subtitle", "visual_direction", "cta"]).reduce<Record<string, string>>((fields, field) => {
+    fields[field] = values[field] || values[field.replace(/^slide\d+_/, "")] || visual;
+    return fields;
+  }, {});
+}
+
+function formatFillPackage(fillPackage: Record<string, string>) {
+  return Object.entries(fillPackage)
+    .map(([key, value]) => `${key}: ${value}`)
+    .join("\n\n");
+}
+
+function slideTextFromFillPackage(fillPackage: Record<string, string>) {
+  return Object.entries(fillPackage)
+    .filter(([key]) => key.startsWith("slide"))
+    .map(([key, value]) => `${key}: ${value}`)
+    .join("\n\n") || formatFillPackage(fillPackage);
 }
 
 function platformMatches(pack: ContentPack, platform: string) {
@@ -102,14 +298,31 @@ function metadataString(pack: ContentPack, key: string) {
   return pack.metadata && typeof pack.metadata[key] === "string" ? String(pack.metadata[key]) : "";
 }
 
-function metadataWithCanva(pack: ContentPack, status: "ready_for_canva" | "design_started" | "designed_in_canva", template?: CanvaTemplate | null) {
+function metadataNumber(pack: ContentPack, key: string) {
+  const value = pack.metadata?.[key];
+  return typeof value === "number" ? value : 0;
+}
+
+function metadataRecord(pack: ContentPack, key: string) {
+  const value = pack.metadata?.[key];
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, string> : {};
+}
+
+function metadataWithCanva(pack: ContentPack, status: "ready_for_canva" | "design_started" | "designed_in_canva", template?: CanvaTemplate | null, match?: CanvaTemplateMatch | null) {
+  const activeMatch = match || (template ? scoreTemplateForPack(pack, template) : null);
+  const activeTemplate = template || activeMatch?.template || null;
+  const fillPackage = activeTemplate ? canvaFillPackage(pack, activeTemplate) : {};
   return {
     ...(pack.metadata || {}),
     canvaPrepStatus: status,
-    canvaBrief: canvaBrief(pack, template),
-    selectedCanvaTemplateId: template?.id || metadataString(pack, "selectedCanvaTemplateId") || null,
-    selectedCanvaTemplateName: template?.template_name || metadataString(pack, "selectedCanvaTemplateName") || null,
-    selectedCanvaTemplateLink: template?.canva_template_link || metadataString(pack, "selectedCanvaTemplateLink") || null,
+    canvaBrief: canvaBrief(pack, activeTemplate),
+    selectedCanvaTemplateId: activeTemplate?.id || metadataString(pack, "selectedCanvaTemplateId") || null,
+    selectedCanvaTemplateName: activeTemplate?.template_name || metadataString(pack, "selectedCanvaTemplateName") || null,
+    selectedCanvaTemplateLink: activeTemplate?.canva_template_link || metadataString(pack, "selectedCanvaTemplateLink") || null,
+    canvaTemplateMatchScore: activeMatch?.score || null,
+    canvaTemplateMatchReason: activeMatch?.reason || null,
+    canvaTemplateRegistryId: activeMatch?.registry?.id || null,
+    canvaFillPackage: fillPackage,
     canvaPrepUpdatedAt: new Date().toISOString()
   };
 }
@@ -172,8 +385,26 @@ export function ApprovalReviewClient() {
   }), [filters, packs]);
 
   const selected = filtered.find((pack) => pack.id === selectedId) || filtered[0] || packs.find((pack) => pack.id === selectedId) || null;
-  const selectedTemplate = templates.find((template) => template.id === selectedTemplateId) || (selected ? templates.find((template) => template.id === metadataString(selected, "selectedCanvaTemplateId")) : null) || null;
+  const recommendedMatch = selected ? bestTemplateMatch(selected, templates) : null;
+  const selectedTemplate = templates.find((template) => template.id === selectedTemplateId) || (selected ? templates.find((template) => template.id === metadataString(selected, "selectedCanvaTemplateId")) : null) || recommendedMatch?.template || null;
+  const selectedTemplateMatch = selected && selectedTemplate ? scoreTemplateForPack(selected, selectedTemplate) : recommendedMatch;
   const brief = selected ? canvaBrief(selected, selectedTemplate) : null;
+  const fillPackage = selected && selectedTemplate ? canvaFillPackage(selected, selectedTemplate) : {};
+  const savedFillPackage = selected && metadataString(selected, "selectedCanvaTemplateId") === selectedTemplate?.id ? metadataRecord(selected, "canvaFillPackage") : {};
+  const visibleFillPackage = Object.keys(savedFillPackage).length ? savedFillPackage : fillPackage;
+
+  useEffect(() => {
+    if (!selected || !templates.length) return;
+    const savedTemplateId = metadataString(selected, "selectedCanvaTemplateId");
+    const recommended = bestTemplateMatch(selected, templates);
+    const savedTemplate = templates.find((template) => template.id === savedTemplateId);
+    const savedScore = savedTemplate ? scoreTemplateForPack(selected, savedTemplate).score : 0;
+    const shouldPreferRecommended = recommended && (!savedTemplate || recommended.score >= savedScore + 10);
+    const recommendedTemplateId = recommended?.template.id || "";
+    const nextTemplateId = savedTemplateId || recommendedTemplateId || templates[0]?.id || "";
+    const preferredTemplateId = shouldPreferRecommended ? recommendedTemplateId : nextTemplateId;
+    setSelectedTemplateId((current) => current === preferredTemplateId ? current : preferredTemplateId);
+  }, [selected, templates]);
 
   async function patchPack(packId: string, updates: Record<string, unknown>, success: string) {
     setBusy(`${packId}:${JSON.stringify(updates)}`);
@@ -240,6 +471,18 @@ export function ApprovalReviewClient() {
     await patchPack(pack.id, { status: "scheduled" }, "Content pack scheduled on the calendar.");
   }
 
+  async function selectTemplateForPack(templateId: string) {
+    setSelectedTemplateId(templateId);
+    if (!selected || !templateId) return;
+    const template = templates.find((item) => item.id === templateId);
+    if (!template) return;
+    const match = scoreTemplateForPack(selected, template);
+    await patchPack(selected.id, {
+      canvaTemplateId: template.id,
+      metadata: metadataWithCanva(selected, designStatus(selected) === "not_started" ? "ready_for_canva" : designStatus(selected) as "ready_for_canva" | "design_started" | "designed_in_canva", template, match)
+    }, "Canva template selection saved.");
+  }
+
   return (
     <div className="space-y-6 text-[#20313f]">
       <section className="overflow-hidden rounded-3xl bg-[#172a3a] p-6 text-white shadow-premium">
@@ -295,9 +538,18 @@ export function ApprovalReviewClient() {
               onApprove={() => patchPack(pack.id, { status: "approved" }, "Content pack approved.")}
               onDraft={() => patchPack(pack.id, { status: "draft" }, "Content pack sent back to draft.")}
               onNeedsReview={() => patchPack(pack.id, { status: "needs_review" }, "Content pack marked needs review.")}
-              onCanva={() => patchPack(pack.id, { metadata: metadataWithCanva(pack, "ready_for_canva", selectedTemplate) }, "Content pack sent to Canva Prep.")}
-              onDesignStarted={() => patchPack(pack.id, { metadata: metadataWithCanva(pack, "design_started", selectedTemplate) }, "Design marked started.")}
-              onDesigned={() => patchPack(pack.id, { metadata: metadataWithCanva(pack, "designed_in_canva", selectedTemplate) }, "Marked as designed in Canva.")}
+              onCanva={() => {
+                const match = bestTemplateMatch(pack, templates);
+                patchPack(pack.id, { canvaTemplateId: match?.template.id || selectedTemplate?.id || null, metadata: metadataWithCanva(pack, "ready_for_canva", match?.template || selectedTemplate, match) }, "Content pack sent to Canva Prep with Canva template match saved.");
+              }}
+              onDesignStarted={() => {
+                const match = bestTemplateMatch(pack, templates);
+                patchPack(pack.id, { canvaTemplateId: selectedTemplate?.id || match?.template.id || null, designStatus: "design_started", metadata: metadataWithCanva(pack, "design_started", selectedTemplate || match?.template, selectedTemplateMatch || match) }, "Design marked started.");
+              }}
+              onDesigned={() => {
+                const match = bestTemplateMatch(pack, templates);
+                patchPack(pack.id, { canvaTemplateId: selectedTemplate?.id || match?.template.id || null, designStatus: "designed_in_canva", metadata: metadataWithCanva(pack, "designed_in_canva", selectedTemplate || match?.template, selectedTemplateMatch || match) }, "Marked as designed in Canva.");
+              }}
               scheduleDate={scheduleDate}
               setScheduleDate={setScheduleDate}
               onSchedule={() => schedule(pack)}
@@ -324,19 +576,40 @@ export function ApprovalReviewClient() {
               <div className="mt-4 grid gap-2">
                 <label>
                   <span className="label">Choose approved Canva template</span>
-                  <select className="field mt-1" value={selectedTemplateId} onChange={(event) => setSelectedTemplateId(event.target.value)}>
+                  <select className="field mt-1" value={selectedTemplateId} onChange={(event) => void selectTemplateForPack(event.target.value)}>
                     <option value="">No approved template selected</option>
                     {templates.map((template) => <option key={template.id} value={template.id}>{template.template_name} · {template.format_type}</option>)}
                   </select>
                 </label>
+                {recommendedMatch ? (
+                  <div className="rounded-2xl bg-[#fffdf8] p-4 ring-1 ring-[#eadfc8]">
+                    <p className="text-xs font-bold uppercase tracking-wide text-[#77633c]">Recommended Template</p>
+                    <h3 className="mt-2 text-lg font-bold text-[#172a3a]">{recommendedMatch.template.template_name}</h3>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <span className="rounded-full bg-[#eee8fb] px-3 py-1 text-xs font-bold text-[#4d3a7a]">Match Score: {recommendedMatch.score}</span>
+                      <span className="rounded-full bg-[#eef3ec] px-3 py-1 text-xs font-bold text-[#4f6f5a]">{recommendedMatch.template.format_type}</span>
+                    </div>
+                    <p className="mt-3 text-sm leading-6 text-[#6f766f]">{recommendedMatch.reason}</p>
+                    {recommendedMatch.template.canva_template_link && <a className="btn-secondary mt-3" href={recommendedMatch.template.canva_template_link} target="_blank" rel="noreferrer"><ExternalLink size={16} />Open Canva Template</a>}
+                  </div>
+                ) : null}
+                {selectedTemplateMatch ? (
+                  <div className="rounded-2xl bg-[#eef3ec] p-4 text-sm leading-6 text-[#4f6f5a]">
+                    <strong>Selected match:</strong> {selectedTemplateMatch.score} · {selectedTemplateMatch.reason}
+                    {selected && metadataNumber(selected, "canvaTemplateMatchScore") ? <span> Saved score: {metadataNumber(selected, "canvaTemplateMatchScore")}.</span> : null}
+                  </div>
+                ) : null}
                 {selectedTemplate?.canva_template_link && <a className="btn-secondary" href={selectedTemplate.canva_template_link} target="_blank" rel="noreferrer"><ExternalLink size={16} />Open Canva Template</a>}
                 <CopyButton text={brief.full} label="Copy Full Canva Brief" />
                 <CopyButton text={brief.full} label="Copy Canva Prompt" />
+                <CopyButton text={formatFillPackage(visibleFillPackage)} label="Copy Full Canva Fill Package" />
+                <CopyButton text={slideTextFromFillPackage(visibleFillPackage)} label="Copy Slide Text" />
                 <CopyButton text={brief.carouselSlides} label="Copy Carousel Slides" />
                 <CopyButton text={brief.pinterest} label="Copy Pinterest Details" />
                 <CopyButton text={brief.caption} label="Copy Caption" />
               </div>
 
+              <PrepBlock title="Canva Fill Package" value={formatFillPackage(visibleFillPackage)} />
               <PrepBlock title="Instagram carousel slide text" value={brief.carouselSlides} />
               <PrepBlock title="Pinterest pin text" value={brief.pinterest} />
               <PrepBlock title="Reel/TikTok cover text" value={brief.coverText} />
