@@ -260,33 +260,6 @@ function formatFillPackage(fillPackage: Record<string, string>) {
     .join("\n\n");
 }
 
-function slideEntriesFromFillPackage(fillPackage: Record<string, string>) {
-  const grouped = Object.entries(fillPackage).reduce<Record<number, { keys: string[]; values: string[] }>>((slides, [key, value]) => {
-    const match = key.match(/^slide(\d+)_/);
-    if (!match) return slides;
-    const number = Number(match[1]);
-    slides[number] = slides[number] || { keys: [], values: [] };
-    slides[number].keys.push(key);
-    slides[number].values.push(value);
-    return slides;
-  }, {});
-  const slides = Object.entries(grouped)
-    .map(([number, slide]) => ({
-      number: Number(number),
-      key: slide.keys.join(" + "),
-      value: slide.values.join("\n\n")
-    }))
-    .sort((a, b) => a.number - b.number);
-
-  if (slides.length) return slides;
-
-  return Object.entries(fillPackage).map(([key, value], index) => ({
-    number: index + 1,
-    key,
-    value
-  }));
-}
-
 function fieldLabel(field: string) {
   return field
     .split("_")
@@ -305,6 +278,12 @@ function templatePreviewFields(template: CanvaTemplate | null, fillPackage: Reco
     label: fieldLabel(field),
     value: fillPackage[field] || ""
   }));
+}
+
+function formatSlideCopyFields(fields: Array<{ label: string; value: string }>) {
+  return fields
+    .map((field) => `${field.label}\n${field.value}`)
+    .join("\n\n");
 }
 
 function platformMatches(pack: ContentPack, platform: string) {
@@ -673,7 +652,7 @@ export function ApprovalReviewClient() {
               </div>
 
               <TemplatePreviewCard template={selectedTemplate} fields={templatePreview} />
-              <SlideFillPackage slides={slideEntriesFromFillPackage(visibleFillPackage)} />
+              <CanvaSlideCopyCenter fields={templatePreview} />
               <PrepBlock title="Instagram carousel slide text" value={brief.carouselSlides} />
               <PrepBlock title="Pinterest pin text" value={brief.pinterest} />
               <PrepBlock title="Reel/TikTok cover text" value={brief.coverText} />
@@ -809,27 +788,27 @@ function TemplatePreviewCard({ template, fields }: { template: CanvaTemplate | n
   );
 }
 
-function SlideFillPackage({ slides }: { slides: Array<{ number: number; key: string; value: string }> }) {
+function CanvaSlideCopyCenter({ fields }: { fields: Array<{ key: string; label: string; value: string }> }) {
   return (
     <div className="mt-4 rounded-2xl bg-[#fffdf8] p-4 ring-1 ring-[#eadfc8]">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-[#77633c]">Canva Fill Package</p>
-          <h3 className="mt-1 text-lg font-bold text-[#172a3a]">Slide-by-slide copy</h3>
+          <p className="text-xs font-bold uppercase tracking-wide text-[#77633c]">Canva Slide Copy</p>
+          <h3 className="mt-1 text-lg font-bold text-[#172a3a]">Copy each field into Canva</h3>
         </div>
-        <span className="rounded-full bg-[#eee8fb] px-3 py-1 text-xs font-bold text-[#4d3a7a]">{slides.length} slides</span>
+        <CopyButton text={formatSlideCopyFields(fields)} label="Copy All Slides" />
       </div>
       <div className="mt-4 grid gap-3">
-        {slides.map((slide) => (
-          <article key={slide.key} className="rounded-2xl border border-[#eadfc8] bg-white p-4 shadow-sm">
+        {fields.map((field) => (
+          <article key={field.key} className="rounded-2xl border border-[#eadfc8] bg-white p-4 shadow-sm">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-xs font-bold uppercase tracking-wide text-[#77633c]">Slide {slide.number}</p>
-                <p className="mt-1 text-[11px] font-semibold text-[#8b9189]">{slide.key}</p>
+                <p className="text-sm font-bold text-[#172a3a]">{field.label}</p>
+                <p className="mt-1 text-[11px] font-semibold text-[#8b9189]">{field.key}</p>
               </div>
-              <CopyButton text={slide.value} label="Copy" />
+              <CopyButton text={field.value} label="Copy" />
             </div>
-            <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-[#20313f]">{slide.value}</p>
+            <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-[#20313f]">{field.value || "Generated content will appear here."}</p>
           </article>
         ))}
       </div>
