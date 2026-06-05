@@ -386,6 +386,7 @@ function canvaBrief(pack: ContentPack, template?: CanvaTemplate | null) {
 
 function designStatus(pack: ContentPack) {
   const metadataStatus = pack.metadata && typeof pack.metadata.canvaPrepStatus === "string" ? pack.metadata.canvaPrepStatus : "";
+  if (metadataStatus && (!pack.design_status || pack.design_status === "not_started")) return metadataStatus;
   return pack.design_status || metadataStatus || "not_started";
 }
 
@@ -699,26 +700,17 @@ export function ApprovalReviewClient() {
                   </div>
                 ) : null}
                 {selectedTemplate?.canva_template_link && <a className="btn-secondary" href={selectedTemplate.canva_template_link} target="_blank" rel="noreferrer"><ExternalLink size={16} />Open Canva Template</a>}
-                <CopyButton text={brief.full} label="Copy Full Canva Brief" />
-                <CopyButton text={brief.full} label="Copy Canva Prompt" />
-                <CopyButton text={formatFillPackage(visibleFillPackage)} label="Copy Full Canva Fill Package" />
-                <CopyButton text={brief.carouselSlides} label="Copy Carousel Slides" />
-                <CopyButton text={brief.pinterest} label="Copy Pinterest Details" />
-                <CopyButton text={brief.caption} label="Copy Caption" />
               </div>
 
               <TemplatePreviewCard template={selectedTemplate} fields={templatePreview} />
               <CanvaSlideCopyCenter fields={templatePreview} />
-              {selected && exportPackage ? <CanvaExportPackageCard pack={selected} json={exportPackageJson} /> : null}
-              <PrepBlock title="Instagram carousel slide text" value={brief.carouselSlides} />
-              <PrepBlock title="Pinterest pin text" value={brief.pinterest} />
-              <PrepBlock title="Reel/TikTok cover text" value={brief.coverText} />
-              <PrepBlock title="Canva design brief" value={selected.pack.canva_visual_direction || "Create a calm LionHeart Therapy branded visual."} />
-              <PrepBlock title="Color palette" value={brief.palette} />
-              <PrepBlock title="Approved template" value={selectedTemplate ? `${selectedTemplate.template_name}\n${selectedTemplate.format_type}\n${selectedTemplate.canva_template_link}` : "Choose an approved Canva template from the library."} />
-              <PrepBlock title="Layout notes" value={brief.layoutNotes} />
-              <PrepBlock title="CTA placement" value={selected.pack.product_cta || selected.pack.therapy_service_cta || "Final slide and caption close."} />
-              <PrepBlock title="@LHtherapy placement" value="Lower corner or final slide footer, visible but subtle." />
+              <AdvancedDeveloperTools
+                selected={selected}
+                selectedTemplate={selectedTemplate}
+                brief={brief}
+                visibleFillPackage={visibleFillPackage}
+                exportPackageJson={exportPackageJson}
+              />
 
               <div className="mt-5 grid gap-2">
                 <label>
@@ -798,6 +790,45 @@ function PackReviewCard({ pack, selected, busy, onSelect, onApprove, onDraft, on
         <button className="btn-secondary border-[#d8c28a] text-[#77633c]" onClick={onDesigned} disabled={busy}><Palette size={16} />Mark Designed</button>
       </div>
     </article>
+  );
+}
+
+function AdvancedDeveloperTools({
+  selected,
+  selectedTemplate,
+  brief,
+  visibleFillPackage,
+  exportPackageJson
+}: {
+  selected: ContentPack;
+  selectedTemplate: CanvaTemplate | null;
+  brief: ReturnType<typeof canvaBrief>;
+  visibleFillPackage: Record<string, string>;
+  exportPackageJson: string;
+}) {
+  return (
+    <details className="mt-5 rounded-2xl border border-[#eadfc8] bg-white/70 p-4">
+      <summary className="cursor-pointer text-sm font-bold text-[#77633c]">Advanced Developer Tools</summary>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <CopyButton text={brief.full} label="Copy Full Canva Brief" />
+        <CopyButton text={brief.full} label="Copy Canva Prompt" />
+        <CopyButton text={formatFillPackage(visibleFillPackage)} label="Copy Full Canva Fill Package" />
+        <CopyButton text={brief.carouselSlides} label="Copy Carousel Slides" />
+        <CopyButton text={brief.pinterest} label="Copy Pinterest Details" />
+        <CopyButton text={brief.caption} label="Copy Caption" />
+      </div>
+
+      {exportPackageJson ? <CanvaExportPackageCard pack={selected} json={exportPackageJson} /> : null}
+      <PrepBlock title="Instagram carousel slide text" value={brief.carouselSlides} />
+      <PrepBlock title="Pinterest pin text" value={brief.pinterest} />
+      <PrepBlock title="Reel/TikTok cover text" value={brief.coverText} />
+      <PrepBlock title="Canva design brief" value={selected.pack.canva_visual_direction || "Create a calm LionHeart Therapy branded visual."} />
+      <PrepBlock title="Color palette" value={brief.palette} />
+      <PrepBlock title="Approved template" value={selectedTemplate ? `${selectedTemplate.template_name}\n${selectedTemplate.format_type}\n${selectedTemplate.canva_template_link}` : "Choose an approved Canva template from the library."} />
+      <PrepBlock title="Layout notes" value={brief.layoutNotes} />
+      <PrepBlock title="CTA placement" value={selected.pack.product_cta || selected.pack.therapy_service_cta || "Final slide and caption close."} />
+      <PrepBlock title="@LHtherapy placement" value="Lower corner or final slide footer, visible but subtle." />
+    </details>
   );
 }
 

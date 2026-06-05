@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Check, ExternalLink } from "lucide-react";
+import { Check, ExternalLink, Send } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { authedFetch } from "@/lib/apiClient";
 import type { GeneratedContent } from "@/lib/types";
 import { CopyButton } from "./CopyButton";
@@ -11,6 +12,8 @@ import { SaveToLibraryButton } from "./media-library/SaveToLibraryButton";
 
 export function ContentCard({ item }: { item: GeneratedContent }) {
   const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const router = useRouter();
 
   async function setStatus(status: string) {
     setMessage("");
@@ -25,6 +28,25 @@ export function ContentCard({ item }: { item: GeneratedContent }) {
     } else {
       setMessage([data.error, Array.isArray(data.issues) ? data.issues.join(" ") : ""].filter(Boolean).join(" "));
     }
+  }
+
+  async function sendToApprovalReview() {
+    setMessage("");
+    setSending(true);
+    const response = await authedFetch("/api/content-packs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ generatedContentId: item.id })
+    });
+    const data = await response.json();
+    setSending(false);
+
+    if (response.ok && data.pack?.id) {
+      router.push("/approval-review");
+      return;
+    }
+
+    setMessage([data.error || "Unable to send this content to Approval Review.", Array.isArray(data.issues) ? data.issues.join(" ") : ""].filter(Boolean).join(" "));
   }
 
   return (
@@ -49,9 +71,9 @@ export function ContentCard({ item }: { item: GeneratedContent }) {
       )}
 
       <div className="mt-5 flex flex-wrap gap-2">
-        <button className="btn-primary" onClick={() => setStatus("approved")} disabled={item.status === "approved"}>
-          <Check size={16} />
-          Approve
+        <button className="btn-primary" onClick={sendToApprovalReview} disabled={sending}>
+          {sending ? <Check size={16} /> : <Send size={16} />}
+          {sending ? "Sending..." : "Approve + Send to Review"}
         </button>
         <CopyButton text={item.caption || ""} label="Copy caption" />
         <CopyButton text={(item.hashtags || []).join(" ")} label="Copy hashtags" />

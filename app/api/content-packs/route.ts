@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { authErrorResponse, requireApiUser } from "@/lib/auth";
+import { scanContentRisk } from "@/lib/brandBrain/riskScan";
 import { generateContentPack } from "@/lib/openai";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
-import type { ContentOpportunity } from "@/lib/types";
+import type { ContentOpportunity, GeneratedContent } from "@/lib/types";
 
 export const runtime = "nodejs";
 
@@ -66,6 +67,125 @@ function contentPackRow(userId: string, opportunity: ContentOpportunity, pack: R
   };
 }
 
+function titleFromGeneratedContent(item: GeneratedContent) {
+  return item.topic || item.hook || `${item.platform || "Social"} ${item.content_type || "content"}`;
+}
+
+function generatedContentPackBody(item: GeneratedContent) {
+  const topic = titleFromGeneratedContent(item);
+  const caption = item.caption || "";
+  const hashtags = item.hashtags?.length ? item.hashtags.join(" ") : "";
+  const visual = item.visual_idea || "Use a calm LionHeart Therapy Canva layout with soft cream, muted navy, sage, and emotionally grounded spacing.";
+  const script = item.script || `${item.hook || topic}\n\nUse the caption as talking points and close with the CTA.`;
+  const cta = "Review, approve, and prepare this for manual posting.";
+  const carouselCopy = item.content_type === "carousel"
+    ? [
+        `Slide 1: ${item.hook || topic}`,
+        "Slide 2: Name the moment or pattern the audience recognizes.",
+        "Slide 3: Explain what may be happening internally.",
+        "Slide 4: Offer a grounded reframe.",
+        "Slide 5: Give one small reflection or next step.",
+        `Slide 6: ${cta}`
+      ].join("\n")
+    : "";
+
+  return {
+    tiktok_reels_script: script,
+    instagram_carousel_outline: item.content_type === "carousel" ? `Carousel for ${topic}: strong hook, recognition, emotional context, gentle reframe, CTA.` : "",
+    slide_by_slide_carousel_copy: carouselCopy,
+    instagram_caption: [caption, hashtags].filter(Boolean).join("\n\n"),
+    pinterest_pin_title: `${topic}: therapist-informed reflection`,
+    pinterest_description: caption || `A LionHeart Therapy post about ${topic}, created for review and manual publishing.`,
+    threads_post: caption ? caption.split("\n").filter(Boolean).slice(0, 2).join("\n") : item.hook || topic,
+    blog_outline: `H1: ${topic}\nSection 1: What this can look like\nSection 2: Why it can feel so intense\nSection 3: A grounded next step\nCTA: ${cta}`,
+    email_newsletter_blurb: caption || `A short therapist-authored note about ${topic}.`,
+    canva_visual_direction: visual,
+    product_cta: "",
+    therapy_service_cta: item.content_goal === "therapy-inquiries" || item.content_goal === "leads" ? "If this feels familiar and you want support, reach out to LionHeart Therapy to explore next steps." : "",
+    safety_disclaimer: "Educational content only. This is not therapy advice, diagnosis, or a substitute for care from a licensed professional."
+  };
+}
+
+function generatedContentPackRow(userId: string, item: GeneratedContent) {
+  const title = titleFromGeneratedContent(item);
+  return {
+    user_id: userId,
+    opportunity_id: null,
+    title,
+    status: "needs_review",
+    source_topic: item.topic || title,
+    audience: null,
+    content_pillar: item.content_goal || null,
+    product_tie_in: null,
+    service_tie_in: item.content_goal === "therapy-inquiries" || item.content_goal === "leads" ? "Therapy inquiries" : null,
+    clinical_sensitivity: "medium",
+    pack: generatedContentPackBody(item),
+    metadata: {
+      generatedFrom: "content_generator",
+      generatedContentId: item.id,
+      contentTopic: item.topic || title,
+      platform: item.platform || null,
+      contentType: item.content_type || null,
+      contentGoal: item.content_goal || null,
+      originalStatus: item.status || null
+    }
+  };
+}
+
+async function createPackFromGeneratedContent(userId: string, generatedContentId: string) {
+  const supabase = getSupabaseAdmin();
+  const { data: item, error: itemError } = await supabase
+    .from("generated_content")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("id", generatedContentId)
+    .single();
+
+  if (itemError) throw new Error(`Unable to load generated content: ${itemError.message}`);
+  const generatedContent = item as GeneratedContent;
+
+  const brandBrain = await loadBrandBrain(userId);
+  const risk = scanContentRisk(generatedContent, brandBrain);
+  if (!risk.passed) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Clinical safety scan blocked approval. Edit the content before sending it to Approval Review.",
+        issues: risk.issues
+      },
+      { status: 400 }
+    );
+  }
+
+  const { data: existing, error: existingError } = await supabase
+    .from("content_packs")
+    .select("*")
+    .eq("user_id", userId)
+    .contains("metadata", { generatedContentId })
+    .maybeSingle();
+
+  if (existingError) throw new Error(`Unable to check existing content pack: ${existingError.message}`);
+
+  await supabase
+    .from("generated_content")
+    .update({ status: "approved" })
+    .eq("user_id", userId)
+    .eq("id", generatedContentId);
+
+  if (existing) {
+    return NextResponse.json({ ok: true, pack: existing, alreadyExists: true });
+  }
+
+  const { data, error } = await supabase
+    .from("content_packs")
+    .insert(generatedContentPackRow(userId, generatedContent))
+    .select("*")
+    .single();
+
+  if (error) throw new Error(`Unable to create Approval Review content pack: ${error.message}`);
+  return NextResponse.json({ ok: true, pack: data });
+}
+
 export async function GET(request: Request) {
   try {
     const user = await requireApiUser(request);
@@ -91,6 +211,11 @@ export async function POST(request: Request) {
   try {
     const user = await requireApiUser(request);
     const body = await request.json();
+    const generatedContentId = typeof body.generatedContentId === "string" ? body.generatedContentId : "";
+    if (generatedContentId) {
+      return createPackFromGeneratedContent(user.id, generatedContentId);
+    }
+
     const opportunityId = typeof body.opportunityId === "string" ? body.opportunityId : undefined;
     const opportunity = await loadOpportunity(user.id, opportunityId, body.opportunity as ContentOpportunity | undefined);
 
