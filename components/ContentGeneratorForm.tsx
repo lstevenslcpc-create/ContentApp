@@ -5,6 +5,25 @@ import { authedFetch } from "@/lib/apiClient";
 import type { GeneratedContent } from "@/lib/types";
 import { ContentCard } from "./ContentCard";
 
+const contentGoals = [
+  "leads",
+  "education",
+  "trust-building",
+  "promotion",
+  "testimonials",
+  "awareness",
+  "follower-growth",
+  "engagement",
+  "saves",
+  "shares",
+  "reach-awareness",
+  "community-building",
+  "thought-leadership",
+  "email-list-growth",
+  "therapy-inquiries",
+  "product-sales"
+];
+
 export function ContentGeneratorForm() {
   const [posts, setPosts] = useState<GeneratedContent[]>([]);
   const [loading, setLoading] = useState(false);
@@ -14,7 +33,15 @@ export function ContentGeneratorForm() {
     setLoading(true);
     setError("");
     setPosts([]);
+    const topic = String(formData.get("topic") || "").trim();
+    if (!topic) {
+      setLoading(false);
+      setError("Add a topic before generating content.");
+      return;
+    }
+
     const payload = {
+      topic,
       platform: formData.get("platform"),
       contentType: formData.get("contentType"),
       contentGoal: formData.get("contentGoal"),
@@ -28,7 +55,10 @@ export function ContentGeneratorForm() {
     const data = await response.json();
     setLoading(false);
     if (!response.ok) setError(data.error || "Generation failed.");
-    else setPosts(data.posts || []);
+    else {
+      setPosts(data.posts || []);
+      if (data.warning) setError(data.warning);
+    }
   }
 
   return (
@@ -37,7 +67,8 @@ export function ContentGeneratorForm() {
         <div className="grid gap-4">
           <label><span className="label">Platform</span><select className="field mt-1" name="platform">{["TikTok","Instagram","Facebook","LinkedIn","YouTube Shorts"].map((x) => <option key={x}>{x}</option>)}</select></label>
           <label><span className="label">Content type</span><select className="field mt-1" name="contentType">{["post","reel","short video","carousel","story","ad"].map((x) => <option key={x}>{x}</option>)}</select></label>
-          <label><span className="label">Content goal</span><select className="field mt-1" name="contentGoal">{["leads","education","trust-building","promotion","testimonials","awareness"].map((x) => <option key={x}>{x}</option>)}</select></label>
+          <label><span className="label">Topic</span><input className="field mt-1" name="topic" required placeholder="anxious attachment, people pleasing, teen anxiety..." /></label>
+          <label><span className="label">Content goal</span><select className="field mt-1" name="contentGoal">{contentGoals.map((x) => <option key={x}>{x}</option>)}</select></label>
           <label><span className="label">Number of posts</span><select className="field mt-1" name="numberOfPosts">{[1,7,30].map((x) => <option key={x}>{x}</option>)}</select></label>
           <button className="btn-primary" disabled={loading}>{loading ? "Generating..." : "Generate Content"}</button>
           {error && <p className="rounded-lg bg-rose-50 p-3 text-sm font-semibold text-rose-700">{error}</p>}

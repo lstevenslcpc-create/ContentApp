@@ -50,6 +50,7 @@ Brand Brain:
 - CTA tone: ${safeBrandBrain.voice_tone.cta_tone}
 - Preferred phrases: ${safeBrandBrain.voice_tone.preferred_phrases.join(", ")}
 - Avoid phrases: ${[...safeBrandBrain.voice_tone.phrases_to_avoid, ...safeBrandBrain.forbidden_ai_phrases].join(", ")}
+- Punctuation rule: Avoid em dashes completely. Do not use — in captions, scripts, emails, blogs, Canva copy, or any generated content. Replace em dashes with periods, commas, colons, or shorter sentences.
 - SEO priorities: ${safeBrandBrain.seo_priorities.join(", ")}
 - Preferred CTA styles: ${safeBrandBrain.preferred_cta_styles.join(", ")}
 - Preferred platforms: ${safeBrandBrain.preferred_platforms.join(", ")}

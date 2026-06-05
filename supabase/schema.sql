@@ -49,6 +49,7 @@ create table if not exists generated_content (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete cascade,
   business_profile_id uuid references business_profiles(id) on delete set null,
+  topic text,
   platform text,
   content_type text,
   content_goal text,
@@ -277,6 +278,7 @@ alter table brand_brains add column if not exists preferred_platforms text[] def
 alter table brand_brains add column if not exists content_goals text[] default '{}';
 alter table brand_brains add column if not exists conversion_priorities text[] default '{}';
 alter table generated_content add column if not exists user_id uuid references auth.users(id) on delete cascade;
+alter table generated_content add column if not exists topic text;
 alter table generated_content add column if not exists canva_design_url text;
 alter table generated_content add column if not exists canva_template_id text;
 alter table content_opportunities add column if not exists user_id uuid references auth.users(id) on delete cascade;

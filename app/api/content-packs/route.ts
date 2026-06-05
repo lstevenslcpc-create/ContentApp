@@ -58,6 +58,7 @@ function contentPackRow(userId: string, opportunity: ContentOpportunity, pack: R
     pack,
     metadata: {
       generatedFrom: "content_intelligence",
+      contentTopic: opportunity.topic || null,
       warnings: warnings || [],
       emotionalTriggerCategory: opportunity.emotional_trigger_category || null,
       seoKeywords: opportunity.seo_keywords || []

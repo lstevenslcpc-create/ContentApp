@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Brain, CheckCircle2, Heart, Palette, Search, ShieldCheck, ShoppingBag, Sparkles, Users, type LucideIcon } from "lucide-react";
 import { authedFetch } from "@/lib/apiClient";
 import { defaultBrandBrain } from "@/lib/brandBrain/defaults";
@@ -27,6 +27,10 @@ function parseListObjects<T>(value: string, fallback: T[]) {
   } catch {
     return fallback;
   }
+}
+
+function listText(value?: string[]) {
+  return value?.length ? value.join(", ") : "Not set yet.";
 }
 
 export function BrandBrainForm() {
@@ -71,6 +75,9 @@ export function BrandBrainForm() {
     const layer = brandBrain.ai_instruction_layer;
     return Object.entries(layer).filter(([, enabled]) => enabled).map(([key]) => key.replaceAll("_", " ")).join(", ");
   }, [brandBrain.ai_instruction_layer]);
+  const audienceProfiles = useMemo(() => parseListObjects(jsonDrafts.audience_profiles, brandBrain.audience_profiles), [brandBrain.audience_profiles, jsonDrafts.audience_profiles]);
+  const therapyServices = useMemo(() => parseListObjects(jsonDrafts.therapy_services, brandBrain.therapy_services), [brandBrain.therapy_services, jsonDrafts.therapy_services]);
+  const productCatalog = useMemo(() => parseListObjects(jsonDrafts.product_catalog, brandBrain.product_catalog), [brandBrain.product_catalog, jsonDrafts.product_catalog]);
 
   function update<K extends keyof EditableBrandBrain>(key: K, value: EditableBrandBrain[K]) {
     setBrandBrain((current) => ({ ...current, [key]: value }));
@@ -169,17 +176,26 @@ export function BrandBrainForm() {
 
       <section className={sectionStyles}>
         <SectionTitle icon={Users} title="Audience Profiles" subtitle="Multiple saved audiences with pain points, triggers, platforms, hooks, and buying behavior." />
-        <JsonEditor value={jsonDrafts.audience_profiles} onChange={(value) => setJsonDrafts((current) => ({ ...current, audience_profiles: value }))} />
+        <AudienceProfileCards profiles={audienceProfiles} />
+        <JsonDetails label="Advanced JSON editor">
+          <JsonEditor value={jsonDrafts.audience_profiles} onChange={(value) => setJsonDrafts((current) => ({ ...current, audience_profiles: value }))} />
+        </JsonDetails>
       </section>
 
       <section className={sectionStyles}>
         <SectionTitle icon={ShieldCheck} title="Therapy Services" subtitle="Service-specific SEO, CTAs, internal links, target audiences, and FAQs." />
-        <JsonEditor value={jsonDrafts.therapy_services} onChange={(value) => setJsonDrafts((current) => ({ ...current, therapy_services: value }))} />
+        <TherapyServiceCards services={therapyServices} />
+        <JsonDetails label="Advanced JSON editor">
+          <JsonEditor value={jsonDrafts.therapy_services} onChange={(value) => setJsonDrafts((current) => ({ ...current, therapy_services: value }))} />
+        </JsonDetails>
       </section>
 
       <section className={sectionStyles}>
         <SectionTitle icon={ShoppingBag} title="Product Catalog" subtitle="Products, emotional pain points, transformation outcomes, CTAs, visuals, SEO, and seasonal opportunities." />
-        <JsonEditor value={jsonDrafts.product_catalog} onChange={(value) => setJsonDrafts((current) => ({ ...current, product_catalog: value }))} />
+        <ProductCatalogCards products={productCatalog} />
+        <JsonDetails label="Advanced JSON editor">
+          <JsonEditor value={jsonDrafts.product_catalog} onChange={(value) => setJsonDrafts((current) => ({ ...current, product_catalog: value }))} />
+        </JsonDetails>
       </section>
 
       <section className={sectionStyles}>
@@ -263,6 +279,72 @@ function Slider({ label, left, right, value, onChange }: { label: string; left: 
       <input className="mt-4 w-full accent-[#b89b5e]" type="range" min={0} max={100} value={value} onChange={(event) => onChange(Number(event.target.value))} />
       <span className="mt-2 flex justify-between text-xs font-semibold text-[#7b7468]"><span>{left}</span><span>{right}</span></span>
     </label>
+  );
+}
+
+function AudienceProfileCards({ profiles }: { profiles: EditableBrandBrain["audience_profiles"] }) {
+  return (
+    <div className="mt-5 grid gap-4 lg:grid-cols-2">
+      {profiles.map((profile) => (
+        <article key={profile.name} className="rounded-2xl border border-[#eadfc8] bg-[#fffdf8] p-4 shadow-sm">
+          <h3 className="text-lg font-bold text-[#172a3a]">{profile.name}</h3>
+          <CardField label="Goals" value={listText(profile.goals)} />
+          <CardField label="Pain Points" value={listText(profile.pain_points)} />
+          <CardField label="Language Style" value={profile.language_style || "Not set yet."} />
+          <CardField label="Resonant Hooks" value={listText(profile.resonant_hooks)} />
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function TherapyServiceCards({ services }: { services: EditableBrandBrain["therapy_services"] }) {
+  return (
+    <div className="mt-5 grid gap-4 lg:grid-cols-2">
+      {services.map((service) => (
+        <article key={service.name} className="rounded-2xl border border-[#eadfc8] bg-[#fffdf8] p-4 shadow-sm">
+          <h3 className="text-lg font-bold text-[#172a3a]">{service.name}</h3>
+          <CardField label="Target Audience" value={service.target_audience || "Not set yet."} />
+          <CardField label="SEO Keywords" value={listText(service.seo_keywords)} />
+          <CardField label="FAQs" value={listText(service.common_faqs)} />
+          <CardField label="CTA" value={service.cta || "Not set yet."} />
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function ProductCatalogCards({ products }: { products: EditableBrandBrain["product_catalog"] }) {
+  return (
+    <div className="mt-5 grid gap-4 lg:grid-cols-2">
+      {products.map((product) => (
+        <article key={product.name} className="rounded-2xl border border-[#eadfc8] bg-[#fffdf8] p-4 shadow-sm">
+          <h3 className="text-lg font-bold text-[#172a3a]">{product.name}</h3>
+          <CardField label="Pain Points" value={listText(product.emotional_pain_points)} />
+          <CardField label="Transformation Outcomes" value={product.transformation_outcome || "Not set yet."} />
+          <CardField label="SEO Keywords" value={listText(product.seo_keywords)} />
+          <CardField label="CTA" value={product.cta || "Not set yet."} />
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function CardField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="mt-3">
+      <p className={labelStyles}>{label}</p>
+      <p className="mt-1 text-sm leading-6 text-[#20313f]">{value}</p>
+    </div>
+  );
+}
+
+function JsonDetails({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <details className="mt-5 rounded-2xl border border-[#eadfc8] bg-white/70 p-4">
+      <summary className="cursor-pointer text-sm font-bold text-[#77633c]">{label}</summary>
+      {children}
+    </details>
   );
 }
 

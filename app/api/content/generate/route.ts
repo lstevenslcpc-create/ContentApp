@@ -9,9 +9,10 @@ export async function POST(request: Request) {
     const user = await requireApiUser(request);
     const body = (await request.json()) as ContentGenerationRequest;
     const numberOfPosts = Number(body.numberOfPosts || 1);
+    const topic = String(body.topic || "").trim();
 
-    if (!body.platform || !body.contentType || !body.contentGoal || ![1, 7, 30].includes(numberOfPosts)) {
-      return NextResponse.json({ error: "platform, contentType, contentGoal, and numberOfPosts are required." }, { status: 400 });
+    if (!topic || !body.platform || !body.contentType || !body.contentGoal || ![1, 7, 30].includes(numberOfPosts)) {
+      return NextResponse.json({ error: "topic, platform, contentType, contentGoal, and numberOfPosts are required." }, { status: 400 });
     }
 
     const supabase = getSupabaseAdmin();
@@ -36,10 +37,11 @@ export async function POST(request: Request) {
 
     if (brandBrainError) throw brandBrainError;
 
-    const posts = await generateStructuredContent(profile, { ...body, numberOfPosts }, brandBrain);
+    const posts = await generateStructuredContent(profile, { ...body, topic, numberOfPosts }, brandBrain);
     const rows = posts.map((post) => ({
       business_profile_id: profile.id,
       user_id: user.id,
+      topic,
       platform: body.platform,
       content_type: body.contentType,
       content_goal: body.contentGoal,
@@ -53,6 +55,15 @@ export async function POST(request: Request) {
     }));
 
     const { data, error } = await supabase.from("generated_content").insert(rows).select("*");
+    if (error && /topic/i.test(error.message || "")) {
+      const fallbackRows = rows.map(({ topic: _topic, ...row }) => row);
+      const retry = await supabase.from("generated_content").insert(fallbackRows).select("*");
+      if (retry.error) throw retry.error;
+      return NextResponse.json({
+        posts: (retry.data || []).map((post) => ({ ...post, topic })),
+        warning: "Content generated, but the generated_content.topic column is missing in Supabase. Run the latest schema migration to save topics permanently."
+      });
+    }
     if (error) throw error;
     return NextResponse.json({ posts: data });
   } catch (error) {

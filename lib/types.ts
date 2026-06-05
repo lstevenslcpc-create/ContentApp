@@ -116,6 +116,7 @@ export type GeneratedContent = {
   id: string;
   user_id?: string | null;
   business_profile_id?: string | null;
+  topic?: string | null;
   platform?: string | null;
   content_type?: string | null;
   content_goal?: string | null;
@@ -335,6 +336,7 @@ export type MediaProviderResponse = {
 };
 
 export type ContentGenerationRequest = {
+  topic: string;
   platform: string;
   contentType: string;
   contentGoal: string;

@@ -7,7 +7,8 @@ export const defaultForbiddenPhrases = [
   "unlock your potential",
   "trauma dump style content",
   "guru-style language",
-  "generic wellness fluff"
+  "generic wellness fluff",
+  "—"
 ];
 
 export const defaultBrandBrain: Omit<BrandBrain, "id" | "user_id" | "created_at" | "updated_at"> = {
@@ -30,7 +31,7 @@ export const defaultBrandBrain: Omit<BrandBrain, "id" | "user_id" | "created_at"
     emotional_tone: "Warm, grounded, validating, clinically informed, never patronizing.",
     humor_level: "Light and human only when appropriate. No sarcasm about pain.",
     sentence_style: "Clear, concise, emotionally intelligent sentences with occasional soft rhythm.",
-    formatting_style: "Short paragraphs, readable hooks, no walls of text, minimal list clutter.",
+    formatting_style: "Short paragraphs, readable hooks, no walls of text, minimal list clutter. Avoid em dashes completely. Do not use — in generated content. Replace em dashes with periods, commas, colons, or shorter sentences.",
     emoji_preferences: "Use rarely. Prefer none unless the platform needs a warmer touch.",
     cta_tone: "Gentle, consent-based, supportive, never fear-driven."
   },
@@ -225,6 +226,23 @@ export const defaultBrandBrain: Omit<BrandBrain, "id" | "user_id" | "created_at"
   seo_priorities: ["anxiety therapy", "teen therapy", "trauma-informed therapy", "therapy for high-achieving women", "mental health workbooks"],
   preferred_cta_styles: ["gentle invitation", "consultation request", "save/share prompt", "product download prompt"],
   preferred_platforms: ["Instagram", "TikTok", "Pinterest", "Facebook", "LinkedIn", "YouTube Shorts"],
-  content_goals: ["education", "trust-building", "lead generation", "product sales", "SEO visibility", "clinical credibility"],
+  content_goals: [
+    "leads",
+    "education",
+    "trust-building",
+    "promotion",
+    "testimonials",
+    "awareness",
+    "follower-growth",
+    "engagement",
+    "saves",
+    "shares",
+    "reach-awareness",
+    "community-building",
+    "thought-leadership",
+    "email-list-growth",
+    "therapy-inquiries",
+    "product-sales"
+  ],
   conversion_priorities: ["therapy consultation", "workbook purchase", "email list signup", "Canva-ready social post", "Pinterest traffic"]
 };

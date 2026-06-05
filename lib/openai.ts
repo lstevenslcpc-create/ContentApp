@@ -81,6 +81,28 @@ type NonStreamingCompletion = {
   }>;
 };
 
+function removeEmDashes(value: string) {
+  return value.replaceAll("—", ".").replace(/\s+\./g, ".").replace(/\.\s*\./g, ".");
+}
+
+function removeEmDashesDeep<T>(value: T): T {
+  if (typeof value === "string") {
+    return removeEmDashes(value) as T;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => removeEmDashesDeep(item)) as T;
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, removeEmDashesDeep(item)])
+    ) as T;
+  }
+
+  return value;
+}
+
 function extractJsonObject(raw: string) {
   const cleaned = raw
     .trim()
@@ -322,7 +344,7 @@ function normalizeOpportunity(opportunity: Partial<ContentOpportunity>, theme: s
     throw new Error(`Opportunity ${index + 1} is missing a topic.`);
   }
 
-  return {
+  return removeEmDashesDeep({
     topic,
     explanation: String(opportunity.explanation || `A humanized LionHeart Therapy content angle about ${theme}, built around emotional specificity and clinical nuance.`).trim(),
     strongest_emotional_hook: emotionalHook,
@@ -352,7 +374,7 @@ function normalizeOpportunity(opportunity: Partial<ContentOpportunity>, theme: s
     cta: String(opportunity.cta || "Save this for later, and reach out when you are ready for support.").trim(),
     clinical_sensitivity: normalizeClinicalSensitivity(opportunity.clinical_sensitivity),
     status: "idea"
-  };
+  });
 }
 
 const contentPackKeys = [
@@ -403,7 +425,7 @@ function normalizeContentPack(value: unknown, opportunity: ContentOpportunity) {
     return { ...accumulator, [key]: text || fallback[key] };
   }, {} as ContentPackBody);
 
-  return { pack, warnings };
+  return { pack: removeEmDashesDeep(pack), warnings };
 }
 
 export async function generateStructuredContent(profile: BusinessProfile, request: ContentGenerationRequest, brandBrain?: BrandBrain | null): Promise<GeneratedPost[]> {
@@ -432,7 +454,7 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
     throw new Error("OpenAI response did not include a posts array.");
   }
 
-  return parsed.posts.map((post) => ({
+  return parsed.posts.map((post) => removeEmDashesDeep({
     hook: String(post.hook || "").trim(),
     caption: String(post.caption || "").trim(),
     hashtags: Array.isArray(post.hashtags) ? post.hashtags.map(String) : [],
@@ -461,7 +483,7 @@ export async function generateContentPack(opportunity: ContentOpportunity, brand
       messages: [
         {
           role: "system",
-          content: "Return only valid JSON. You are LionHeart Therapy's therapist-creator content pack strategist. Keep the voice emotionally specific, clinically grounded, modern, and human."
+          content: "Return only valid JSON. You are LionHeart Therapy's therapist-creator content pack strategist. Keep the voice emotionally specific, clinically grounded, modern, and human. Avoid em dashes completely. Do not use — in any generated content."
         },
         {
           role: "user",
@@ -480,6 +502,7 @@ Rules:
 - Make the content sound like a real therapist creator, not generic AI.
 - Use emotional specificity: inner dialogue, hidden behaviors, attachment patterns, nervous system responses, avoidance, perfectionism, conflict anxiety, and relational tension when relevant.
 - Avoid fake inspirational language and banned wellness phrases.
+- Avoid em dashes completely. Do not use — in any generated content. Replace em dashes with periods, commas, colons, or shorter sentences.
 - Do not overpromise, diagnose, or imply guaranteed outcomes.
 - If clinical sensitivity is medium or high, include a clear safety disclaimer.
 - Make Canva directions specific enough for a designer or Canva template workflow.
@@ -591,7 +614,7 @@ export async function generateContentOpportunities(theme: string, brandBrain?: B
       messages: [
         {
           role: "system",
-          content: "Return only valid JSON. You are a therapist-creator content strategist. Do not claim access to live trend APIs, live search volume, or real-time social data. Avoid generic wellness language."
+          content: "Return only valid JSON. You are a therapist-creator content strategist. Do not claim access to live trend APIs, live search volume, or real-time social data. Avoid generic wellness language. Avoid em dashes completely. Do not use — in any generated content."
         },
         {
           role: "user",
@@ -647,6 +670,7 @@ Avoid:
 - generic wellness influencer phrasing
 - excessive positivity
 - fake inspirational wording
+- em dashes or the — character
 - "healing journey"
 - "just breathe"
 - "you are enough"
