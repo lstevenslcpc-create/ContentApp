@@ -702,8 +702,8 @@ export function ApprovalReviewClient() {
                 {selectedTemplate?.canva_template_link && <a className="btn-secondary" href={selectedTemplate.canva_template_link} target="_blank" rel="noreferrer"><ExternalLink size={16} />Open Canva Template</a>}
               </div>
 
-              <TemplatePreviewCard template={selectedTemplate} fields={templatePreview} />
               <CanvaSlideCopyCenter fields={templatePreview} />
+              <TemplateDetails template={selectedTemplate} fields={templatePreview} />
               <AdvancedDeveloperTools
                 selected={selected}
                 selectedTemplate={selectedTemplate}
@@ -841,12 +841,13 @@ function PrepBlock({ title, value }: { title: string; value: string }) {
   );
 }
 
-function TemplatePreviewCard({ template, fields }: { template: CanvaTemplate | null; fields: Array<{ key: string; label: string; value: string }> }) {
+function TemplateDetails({ template, fields }: { template: CanvaTemplate | null; fields: Array<{ key: string; label: string; value: string }> }) {
   return (
-    <div className="mt-4 rounded-2xl bg-[#f8f5ee] p-4 ring-1 ring-[#d8c28a]">
+    <details className="mt-4 rounded-2xl border border-[#eadfc8] bg-white/70 p-4">
+      <summary className="cursor-pointer text-sm font-bold text-[#77633c]">Template Details</summary>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-[#77633c]">Template Preview</p>
+          <p className="mt-4 text-xs font-bold uppercase tracking-wide text-[#77633c]">Template Preview</p>
           <h3 className="mt-1 text-xl font-bold text-[#172a3a]">{template?.template_name || "Choose an approved Canva template"}</h3>
           {template?.canva_template_link ? (
             <a className="mt-2 inline-flex items-center gap-2 text-sm font-bold text-[#4d3a7a] underline-offset-4 hover:underline" href={template.canva_template_link} target="_blank" rel="noreferrer">
@@ -862,17 +863,14 @@ function TemplatePreviewCard({ template, fields }: { template: CanvaTemplate | n
         <p className="text-xs font-bold uppercase tracking-wide text-[#77633c]">Fields Required</p>
         <div className="mt-3 grid gap-3">
           {fields.map((field) => (
-            <div key={field.key} className="grid gap-2 rounded-2xl border border-[#eadfc8] bg-white p-3 md:grid-cols-[145px_1fr]">
-              <div>
-                <p className="text-sm font-bold text-[#172a3a]">{field.label}</p>
-                <p className="mt-1 text-[11px] font-semibold text-[#8b9189]">{field.key}</p>
-              </div>
-              <p className="whitespace-pre-wrap text-sm leading-6 text-[#20313f]">{field.value || "Generated content will appear here."}</p>
+            <div key={field.key} className="grid gap-2 rounded-2xl border border-[#eadfc8] bg-white p-3 md:grid-cols-[160px_1fr]">
+              <p className="text-sm font-bold text-[#172a3a]">{field.label}</p>
+              <p className="text-xs font-semibold text-[#8b9189]">{field.key}</p>
             </div>
           ))}
         </div>
       </div>
-    </div>
+    </details>
   );
 }
 
@@ -892,7 +890,6 @@ function CanvaSlideCopyCenter({ fields }: { fields: Array<{ key: string; label: 
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-bold text-[#172a3a]">{field.label}</p>
-                <p className="mt-1 text-[11px] font-semibold text-[#8b9189]">{field.key}</p>
               </div>
               <CopyButton text={field.value} label="Copy" />
             </div>
