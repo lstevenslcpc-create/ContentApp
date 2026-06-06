@@ -126,6 +126,16 @@ export async function PATCH(request: Request, context: RouteContext) {
       updates.metadata = body.metadata;
     }
 
+    if (typeof body.archived === "boolean") {
+      const existing = await loadPack(user.id, id);
+      updates.metadata = {
+        ...(existing.metadata && typeof existing.metadata === "object" ? existing.metadata as Record<string, unknown> : {}),
+        ...(updates.metadata && typeof updates.metadata === "object" ? updates.metadata : {}),
+        archived: body.archived,
+        archivedAt: body.archived ? new Date().toISOString() : null
+      };
+    }
+
     if (!Object.keys(updates).length) {
       return NextResponse.json({ ok: false, error: "No content pack updates were provided." }, { status: 400 });
     }
@@ -143,6 +153,34 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ ok: true, pack: data });
   } catch (error) {
     console.error("[content-packs][PATCH]", { message: errorMessage(error) });
+    const authResponse = authErrorResponse(error);
+    if (authResponse) return authResponse;
+    return NextResponse.json({ ok: false, error: errorMessage(error) }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request, context: RouteContext) {
+  try {
+    const user = await requireApiUser(request);
+    const id = await paramsId(context);
+    const supabase = getSupabaseAdmin();
+
+    await supabase
+      .from("content_calendar_plans")
+      .update({ content_pack_id: null })
+      .eq("user_id", user.id)
+      .eq("content_pack_id", id);
+
+    const { error } = await supabase
+      .from("content_packs")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("id", id);
+
+    if (error) throw error;
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("[content-packs][DELETE]", { message: errorMessage(error) });
     const authResponse = authErrorResponse(error);
     if (authResponse) return authResponse;
     return NextResponse.json({ ok: false, error: errorMessage(error) }, { status: 500 });

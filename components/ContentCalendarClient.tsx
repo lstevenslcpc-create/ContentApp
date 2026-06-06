@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, Loader2, Plus, Save, Sparkles } from "lucide-react";
 import { authedFetch } from "@/lib/apiClient";
+import { ContentLifecycleActions } from "@/components/ContentLifecycleActions";
 import type { CalendarPlanStatus, ContentCalendarFocus, ContentCalendarPlan, ContentPack } from "@/lib/types";
 
 const campaignLabels = [
@@ -68,6 +69,10 @@ async function readApiResponse(response: Response) {
   }
 }
 
+function isPackArchived(pack?: ContentPack | null) {
+  return Boolean(pack?.archived || pack?.metadata?.archived);
+}
+
 export function ContentCalendarClient() {
   const [view, setView] = useState<"month" | "week">("month");
   const [anchor, setAnchor] = useState(() => new Date());
@@ -84,17 +89,21 @@ export function ContentCalendarClient() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState("");
   const [message, setMessage] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
 
   const visibleDays = useMemo(() => view === "month" ? monthDays(anchor) : weekDays(anchor), [anchor, view]);
   const rangeStart = dateKey(visibleDays[0]);
   const rangeEnd = dateKey(visibleDays[visibleDays.length - 1]);
   const currentWeekStart = dateKey(startOfWeek(new Date(`${selectedDate}T12:00:00`)));
 
-  const plansByDate = useMemo(() => plans.reduce<Record<string, ContentCalendarPlan[]>>((accumulator, plan) => {
+  const visiblePacks = useMemo(() => packs.filter((pack) => showArchived || !isPackArchived(pack)), [packs, showArchived]);
+  const visiblePlans = useMemo(() => plans.filter((plan) => showArchived || !isPackArchived(plan.content_pack)), [plans, showArchived]);
+
+  const plansByDate = useMemo(() => visiblePlans.reduce<Record<string, ContentCalendarPlan[]>>((accumulator, plan) => {
     accumulator[plan.planned_date] = accumulator[plan.planned_date] || [];
     accumulator[plan.planned_date].push(plan);
     return accumulator;
-  }, {}), [plans]);
+  }, {}), [visiblePlans]);
 
   useEffect(() => {
     const focus = focuses.find((item) => item.week_start === currentWeekStart);
@@ -184,6 +193,41 @@ export function ContentCalendarClient() {
     setPlans((current) => current.map((plan) => plan.id === planId ? data.plan as ContentCalendarPlan : plan));
   }
 
+  async function archivePack(pack: ContentPack, archived: boolean) {
+    setSaving(`${pack.id}:archive`);
+    setMessage("");
+    const response = await authedFetch(`/api/content-packs/${pack.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ archived })
+    });
+    const data = await readApiResponse(response);
+    setSaving("");
+    if (!response.ok) {
+      setMessage(typeof data.error === "string" ? data.error : "Unable to update archived state.");
+      return;
+    }
+    const updated = data.pack as ContentPack;
+    setPacks((current) => current.map((item) => item.id === updated.id ? updated : item));
+    setPlans((current) => current.map((plan) => plan.content_pack_id === updated.id ? { ...plan, content_pack: updated } : plan));
+    setMessage(archived ? "Content pack archived." : "Content pack restored.");
+  }
+
+  async function deletePack(pack: ContentPack) {
+    setSaving(`${pack.id}:delete`);
+    setMessage("");
+    const response = await authedFetch(`/api/content-packs/${pack.id}`, { method: "DELETE" });
+    const data = await readApiResponse(response);
+    setSaving("");
+    if (!response.ok) {
+      setMessage(typeof data.error === "string" ? data.error : "Unable to delete content pack.");
+      return;
+    }
+    setPacks((current) => current.filter((item) => item.id !== pack.id));
+    setPlans((current) => current.map((plan) => plan.content_pack_id === pack.id ? { ...plan, content_pack_id: null, content_pack: null } : plan));
+    setMessage("Content pack deleted permanently.");
+  }
+
   const title = view === "month"
     ? anchor.toLocaleDateString(undefined, { month: "long", year: "numeric" })
     : `${visibleDays[0].toLocaleDateString(undefined, { month: "short", day: "numeric" })} - ${visibleDays[6].toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
@@ -209,6 +253,13 @@ export function ContentCalendarClient() {
           </div>
         </div>
       </section>
+
+      <div className="flex justify-end">
+        <label className="flex items-center gap-2 text-sm font-bold text-[#6f766f]">
+          <input type="checkbox" checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} />
+          Show Archived
+        </label>
+      </div>
 
       <section className="grid gap-4 lg:grid-cols-[1fr_360px]">
         <div className="rounded-3xl border border-[#e9dfcf] bg-white/90 p-5 shadow-sm">
@@ -295,7 +346,7 @@ export function ContentCalendarClient() {
               <span className="label">Saved content pack</span>
               <select className="field mt-1" value={selectedPackId} onChange={(event) => setSelectedPackId(event.target.value)}>
                 <option value="">Choose a pack</option>
-                {packs.map((pack) => <option key={pack.id} value={pack.id}>{pack.title}</option>)}
+                {visiblePacks.map((pack) => <option key={pack.id} value={pack.id}>{pack.title}</option>)}
               </select>
             </label>
 
@@ -330,14 +381,14 @@ export function ContentCalendarClient() {
               {saving === "plan" ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} />}
               Add Content Pack
             </button>
-            {!packs.length && <p className="mt-3 text-xs leading-5 text-[#8a6926]">Create and save a Content Pack first, then assign it to campaign dates here.</p>}
+            {!visiblePacks.length && <p className="mt-3 text-xs leading-5 text-[#8a6926]">Create and save a Content Pack first, then assign it to campaign dates here.</p>}
           </section>
 
           <section className="rounded-3xl border border-[#e9dfcf] bg-white p-5 shadow-sm">
             <h3 className="text-lg font-bold text-[#172a3a]">Selected Day</h3>
             <div className="mt-4 space-y-3">
               {(plansByDate[selectedDate] || []).length ? plansByDate[selectedDate].map((plan) => (
-                <PlanCard key={plan.id} plan={plan} saving={saving === plan.id} onStatus={updateStatus} />
+                <PlanCard key={plan.id} plan={plan} saving={saving === plan.id || Boolean(plan.content_pack_id && saving.startsWith(plan.content_pack_id))} onStatus={updateStatus} onArchive={archivePack} onDelete={deletePack} />
               )) : (
                 <p className="rounded-2xl border border-dashed border-[#eadfc8] bg-[#fffdf8] p-4 text-sm text-[#6f766f]">No content packs assigned to this date yet.</p>
               )}
@@ -363,15 +414,33 @@ function PlanMini({ plan }: { plan: ContentCalendarPlan }) {
   );
 }
 
-function PlanCard({ plan, saving, onStatus }: { plan: ContentCalendarPlan; saving: boolean; onStatus: (id: string, status: CalendarPlanStatus) => void }) {
+function PlanCard({ plan, saving, onStatus, onArchive, onDelete }: {
+  plan: ContentCalendarPlan;
+  saving: boolean;
+  onStatus: (id: string, status: CalendarPlanStatus) => void;
+  onArchive: (pack: ContentPack, archived: boolean) => void;
+  onDelete: (pack: ContentPack) => void;
+}) {
   return (
     <article className="rounded-2xl border border-[#eadfc8] bg-[#fffdf8] p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <StatusBadge status={plan.status} />
           <h4 className="mt-3 text-sm font-bold leading-5 text-[#172a3a]">{plan.content_pack?.title || "Content pack"}</h4>
+          {isPackArchived(plan.content_pack) ? <p className="mt-2 text-xs font-bold uppercase tracking-wide text-[#8a6926]">Archived</p> : null}
         </div>
-        {plan.content_pack_id && <Link className="text-xs font-bold text-[#4d3a7a]" href={`/content-packs/${plan.content_pack_id}`}>Open</Link>}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {plan.content_pack_id && <Link className="text-xs font-bold text-[#4d3a7a]" href={`/content-packs/${plan.content_pack_id}`}>Open</Link>}
+          {plan.content_pack ? (
+            <ContentLifecycleActions
+              archived={isPackArchived(plan.content_pack)}
+              busy={saving}
+              onArchive={() => onArchive(plan.content_pack as ContentPack, true)}
+              onRestore={() => onArchive(plan.content_pack as ContentPack, false)}
+              onDelete={() => onDelete(plan.content_pack as ContentPack)}
+            />
+          ) : null}
+        </div>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
         {[plan.campaign_label, plan.seasonal_prompt].filter(Boolean).map((label) => <span key={label} className="rounded-full bg-[#f7f1e6] px-2 py-1 text-[11px] font-bold text-[#77633c]">{label}</span>)}

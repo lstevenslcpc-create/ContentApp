@@ -67,6 +67,7 @@ create table if not exists generated_content (
   media_status text,
   canva_design_url text,
   canva_template_id text,
+  archived boolean default false,
   created_at timestamptz default now(),
   updated_at timestamptz default now(),
   constraint generated_content_status_check check (status in ('draft', 'needs_review', 'approved', 'scheduled', 'posted', 'failed')),
@@ -281,6 +282,7 @@ alter table generated_content add column if not exists user_id uuid references a
 alter table generated_content add column if not exists topic text;
 alter table generated_content add column if not exists canva_design_url text;
 alter table generated_content add column if not exists canva_template_id text;
+alter table generated_content add column if not exists archived boolean default false;
 alter table content_opportunities add column if not exists user_id uuid references auth.users(id) on delete cascade;
 alter table content_opportunities add column if not exists topic text;
 alter table content_opportunities add column if not exists explanation text;

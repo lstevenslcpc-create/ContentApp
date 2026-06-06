@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, ExternalLink, Loader2, Megaphone, Send, XCircle } from "lucide-react";
 import { authedFetch } from "@/lib/apiClient";
 import { CopyButton } from "@/components/CopyButton";
+import { ContentLifecycleActions } from "@/components/ContentLifecycleActions";
 import type { ContentCalendarPlan, ContentPack } from "@/lib/types";
 
 type CalendarResponse = {
@@ -40,6 +41,10 @@ function metadataRecord(pack: ContentPack, key: string) {
 function metadataArray(pack: ContentPack, key: string) {
   const value = pack.metadata?.[key];
   return Array.isArray(value) ? value : [];
+}
+
+function isPackArchived(pack: ContentPack) {
+  return Boolean(pack.archived || pack.metadata?.archived);
 }
 
 function designStatus(pack: ContentPack) {
@@ -148,6 +153,7 @@ export function ReadyToPostClient() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
 
   async function loadReadyData() {
     setLoading(true);
@@ -170,15 +176,17 @@ export function ReadyToPostClient() {
     void loadReadyData();
   }, []);
 
-  const readyPacks = useMemo(() => packs.filter((pack) => {
+  const visiblePacks = useMemo(() => packs.filter((pack) => showArchived || !isPackArchived(pack)), [packs, showArchived]);
+
+  const readyPacks = useMemo(() => visiblePacks.filter((pack) => {
     const status = postingStatus(pack);
     return pack.status === "approved" && isDesigned(pack) && status !== "posted" && status !== "failed";
-  }), [packs]);
+  }), [visiblePacks]);
 
-  const historyPacks = useMemo(() => packs.filter((pack) => {
+  const historyPacks = useMemo(() => visiblePacks.filter((pack) => {
     const status = postingStatus(pack);
     return status === "posted" || status === "failed";
-  }), [packs]);
+  }), [visiblePacks]);
 
   const grouped = useMemo(() => groupedReadyPacks(readyPacks, plans), [readyPacks, plans]);
 
@@ -218,6 +226,39 @@ export function ReadyToPostClient() {
     setMessage(status === "posted" ? "Marked as posted and moved to Posted History." : "Marked as failed and moved to Posted History.");
   }
 
+  async function archivePack(pack: ContentPack, archived: boolean) {
+    setBusy(`${pack.id}:archive`);
+    setMessage("");
+    const response = await authedFetch(`/api/content-packs/${pack.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ archived })
+    });
+    const data = await readApiResponse(response);
+    setBusy("");
+    if (!response.ok) {
+      setMessage(typeof data.error === "string" ? data.error : "Unable to update archived state.");
+      return;
+    }
+    const updated = data.pack as ContentPack;
+    setPacks((current) => current.map((item) => item.id === updated.id ? updated : item));
+    setMessage(archived ? "Content pack archived." : "Content pack restored.");
+  }
+
+  async function deletePack(pack: ContentPack) {
+    setBusy(`${pack.id}:delete`);
+    setMessage("");
+    const response = await authedFetch(`/api/content-packs/${pack.id}`, { method: "DELETE" });
+    const data = await readApiResponse(response);
+    setBusy("");
+    if (!response.ok) {
+      setMessage(typeof data.error === "string" ? data.error : "Unable to delete content pack.");
+      return;
+    }
+    setPacks((current) => current.filter((item) => item.id !== pack.id));
+    setMessage("Content pack deleted permanently.");
+  }
+
   return (
     <div className="space-y-6 text-[#20313f]">
       <section className="overflow-hidden rounded-3xl bg-[#172a3a] p-6 text-white shadow-premium">
@@ -238,6 +279,13 @@ export function ReadyToPostClient() {
         <Metric label="Designed" value={packs.filter(isDesigned).length} />
       </section>
 
+      <div className="flex justify-end">
+        <label className="flex items-center gap-2 text-sm font-bold text-[#6f766f]">
+          <input type="checkbox" checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} />
+          Show Archived
+        </label>
+      </div>
+
       {loading ? (
         <div className="rounded-3xl bg-white p-8 text-center text-sm font-bold text-[#6f766f]"><Loader2 className="mx-auto mb-3 animate-spin" />Loading ready-to-post workflow...</div>
       ) : null}
@@ -255,7 +303,7 @@ export function ReadyToPostClient() {
             <h2 className="rounded-2xl bg-[#f8f5ee] px-4 py-3 text-sm font-bold text-[#77633c] ring-1 ring-[#eadfc8]">{group}</h2>
             <div className="grid gap-4 xl:grid-cols-2">
               {groupPacks.map((pack) => (
-                <PostingCard key={pack.id} pack={pack} plans={plans} busy={busy.startsWith(pack.id)} onStatus={markPostingStatus} />
+                <PostingCard key={pack.id} pack={pack} plans={plans} busy={busy.startsWith(pack.id)} onStatus={markPostingStatus} onArchive={archivePack} onDelete={deletePack} />
               ))}
             </div>
           </div>
@@ -271,7 +319,7 @@ export function ReadyToPostClient() {
           <span className="rounded-full bg-[#f8f5ee] px-3 py-1 text-xs font-bold text-[#77633c]">{historyPacks.length} items</span>
         </div>
         <div className="mt-4 grid gap-3">
-          {historyPacks.length ? historyPacks.map((pack) => <HistoryCard key={pack.id} pack={pack} />) : <p className="text-sm text-[#6f766f]">Posted and failed items will appear here after you mark them.</p>}
+          {historyPacks.length ? historyPacks.map((pack) => <HistoryCard key={pack.id} pack={pack} busy={busy.startsWith(pack.id)} onArchive={archivePack} onDelete={deletePack} />) : <p className="text-sm text-[#6f766f]">Posted and failed items will appear here after you mark them.</p>}
         </div>
       </section>
     </div>
@@ -287,7 +335,14 @@ function Metric({ label, value }: { label: string; value: number }) {
   );
 }
 
-function PostingCard({ pack, plans, busy, onStatus }: { pack: ContentPack; plans: ContentCalendarPlan[]; busy: boolean; onStatus: (pack: ContentPack, status: PostingState) => void }) {
+function PostingCard({ pack, plans, busy, onStatus, onArchive, onDelete }: {
+  pack: ContentPack;
+  plans: ContentCalendarPlan[];
+  busy: boolean;
+  onStatus: (pack: ContentPack, status: PostingState) => void;
+  onArchive: (pack: ContentPack, archived: boolean) => void;
+  onDelete: (pack: ContentPack) => void;
+}) {
   const scheduledDate = plannedDateForPack(pack, plans);
   const caption = pack.pack.instagram_caption || "";
   const hashtags = hashtagsFromCaption(caption);
@@ -336,6 +391,13 @@ function PostingCard({ pack, plans, busy, onStatus }: { pack: ContentPack; plans
         {socialLinks().map((link) => <a key={link.href} className="btn-secondary" href={link.href} target="_blank" rel="noreferrer"><ExternalLink size={16} />{link.label}</a>)}
         <button className="btn-primary bg-[#172a3a] hover:bg-[#22384a]" disabled={busy} onClick={() => onStatus(pack, "posted")}><Send size={16} />Mark posted</button>
         <button className="btn-secondary border-[#d8c28a] text-[#77633c]" disabled={busy} onClick={() => onStatus(pack, "failed")}><XCircle size={16} />Mark failed</button>
+        <ContentLifecycleActions
+          archived={isPackArchived(pack)}
+          busy={busy}
+          onArchive={() => onArchive(pack, true)}
+          onRestore={() => onArchive(pack, false)}
+          onDelete={() => onDelete(pack)}
+        />
       </div>
     </article>
   );
@@ -350,7 +412,12 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function HistoryCard({ pack }: { pack: ContentPack }) {
+function HistoryCard({ pack, busy, onArchive, onDelete }: {
+  pack: ContentPack;
+  busy: boolean;
+  onArchive: (pack: ContentPack, archived: boolean) => void;
+  onDelete: (pack: ContentPack) => void;
+}) {
   const status = postingStatus(pack);
   const history = metadataArray(pack, "manualPostingHistory");
   const latest = history[history.length - 1] as { at?: string; platform?: string } | undefined;
@@ -361,7 +428,16 @@ function HistoryCard({ pack }: { pack: ContentPack }) {
           <p className="text-xs font-bold uppercase tracking-wide text-[#77633c]">{latest?.platform || platformForPack(pack)} · {latest?.at ? new Date(latest.at).toLocaleString() : "No timestamp"}</p>
           <h3 className="mt-1 text-lg font-bold text-[#172a3a]">{pack.title}</h3>
         </div>
-        <span className={`rounded-full px-3 py-1 text-xs font-bold uppercase ${status === "posted" ? "bg-[#eef3ec] text-[#4f6f5a]" : "bg-[#fff4d8] text-[#8a6926]"}`}>{status}</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={`rounded-full px-3 py-1 text-xs font-bold uppercase ${status === "posted" ? "bg-[#eef3ec] text-[#4f6f5a]" : "bg-[#fff4d8] text-[#8a6926]"}`}>{status}</span>
+          <ContentLifecycleActions
+            archived={isPackArchived(pack)}
+            busy={busy}
+            onArchive={() => onArchive(pack, true)}
+            onRestore={() => onArchive(pack, false)}
+            onDelete={() => onDelete(pack)}
+          />
+        </div>
       </div>
       <div className="mt-4 grid gap-2 md:grid-cols-5">
         {["views", "saves", "shares", "clicks", "notes"].map((item) => (

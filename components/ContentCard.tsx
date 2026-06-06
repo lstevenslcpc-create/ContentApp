@@ -9,10 +9,12 @@ import { CopyButton } from "./CopyButton";
 import { StatusPill } from "./StatusPill";
 import { useState } from "react";
 import { SaveToLibraryButton } from "./media-library/SaveToLibraryButton";
+import { ContentLifecycleActions } from "./ContentLifecycleActions";
 
-export function ContentCard({ item }: { item: GeneratedContent }) {
+export function ContentCard({ item, onUpdate, onRemove }: { item: GeneratedContent; onUpdate?: (item: GeneratedContent) => void; onRemove?: (id: string) => void }) {
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
+  const [busyAction, setBusyAction] = useState("");
   const router = useRouter();
 
   async function setStatus(status: string) {
@@ -26,8 +28,38 @@ export function ContentCard({ item }: { item: GeneratedContent }) {
     if (response.ok) {
       window.location.reload();
     } else {
-      setMessage([data.error, Array.isArray(data.issues) ? data.issues.join(" ") : ""].filter(Boolean).join(" "));
+    setMessage([data.error, Array.isArray(data.issues) ? data.issues.join(" ") : ""].filter(Boolean).join(" "));
     }
+  }
+
+  async function setArchived(archived: boolean) {
+    setBusyAction(archived ? "archive" : "restore");
+    setMessage("");
+    const response = await authedFetch(`/api/content/${item.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ archived })
+    });
+    const data = await response.json();
+    setBusyAction("");
+    if (!response.ok) {
+      setMessage(data.error || "Unable to update archived state.");
+      return;
+    }
+    onUpdate?.(data.item as GeneratedContent);
+  }
+
+  async function deleteContent() {
+    setBusyAction("delete");
+    setMessage("");
+    const response = await authedFetch(`/api/content/${item.id}`, { method: "DELETE" });
+    const data = await response.json().catch(() => ({}));
+    setBusyAction("");
+    if (!response.ok) {
+      setMessage(data.error || "Unable to delete this content.");
+      return;
+    }
+    onRemove?.(item.id);
   }
 
   async function sendToApprovalReview() {
@@ -75,6 +107,13 @@ export function ContentCard({ item }: { item: GeneratedContent }) {
           {sending ? <Check size={16} /> : <Send size={16} />}
           {sending ? "Sending..." : "Approve + Send to Review"}
         </button>
+        <ContentLifecycleActions
+          archived={Boolean(item.archived)}
+          busy={Boolean(busyAction)}
+          onArchive={() => void setArchived(true)}
+          onRestore={() => void setArchived(false)}
+          onDelete={() => void deleteContent()}
+        />
         <CopyButton text={item.caption || ""} label="Copy caption" />
         <CopyButton text={(item.hashtags || []).join(" ")} label="Copy hashtags" />
         <SaveToLibraryButton

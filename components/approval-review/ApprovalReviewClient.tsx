@@ -6,6 +6,7 @@ import { CalendarPlus, CheckCircle2, Download, Edit3, ExternalLink, Loader2, Pal
 import { authedFetch } from "@/lib/apiClient";
 import { CANVA_TEMPLATES, type CanvaTemplateRegistryItem } from "@/lib/canvaTemplates";
 import { CopyButton } from "@/components/CopyButton";
+import { ContentLifecycleActions } from "@/components/ContentLifecycleActions";
 import type { CanvaTemplate, ContentPack, ContentPackBody, ContentPackSectionKey, ContentStatus } from "@/lib/types";
 
 const statuses: Array<ContentStatus | "all"> = ["all", "draft", "needs_review", "approved", "scheduled", "posted", "failed"];
@@ -404,6 +405,10 @@ function metadataRecord(pack: ContentPack, key: string) {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, string> : {};
 }
 
+function isPackArchived(pack: ContentPack) {
+  return Boolean(pack.archived || pack.metadata?.archived);
+}
+
 function metadataWithCanva(pack: ContentPack, status: "ready_for_canva" | "design_started" | "designed_in_canva", template?: CanvaTemplate | null, match?: CanvaTemplateMatch | null) {
   const activeMatch = match || (template ? scoreTemplateForPack(pack, template) : null);
   const activeTemplate = template || activeMatch?.template || null;
@@ -435,6 +440,7 @@ export function ApprovalReviewClient() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
 
   async function loadPacks() {
     setLoading(true);
@@ -468,6 +474,7 @@ export function ApprovalReviewClient() {
 
   const filtered = useMemo(() => packs.filter((pack) => {
     const text = `${pack.title} ${pack.audience || ""} ${pack.content_pillar || ""} ${pack.product_tie_in || ""} ${pack.service_tie_in || ""} ${packText(pack)}`.toLowerCase();
+    if (!showArchived && isPackArchived(pack)) return false;
     if (filters.status !== "all" && pack.status !== filters.status) return false;
     if (!platformMatches(pack, filters.platform)) return false;
     if (filters.campaign !== "all" && !text.includes(filters.campaign.toLowerCase())) return false;
@@ -479,7 +486,7 @@ export function ApprovalReviewClient() {
     if (filters.date && !String(pack.created_at || "").startsWith(filters.date)) return false;
     if (filters.query && !text.includes(filters.query.toLowerCase())) return false;
     return true;
-  }), [filters, packs]);
+  }), [filters, packs, showArchived]);
 
   const selected = filtered.find((pack) => pack.id === selectedId) || filtered[0] || packs.find((pack) => pack.id === selectedId) || null;
   const recommendedMatch = selected ? bestTemplateMatch(selected, templates) : null;
@@ -524,6 +531,25 @@ export function ApprovalReviewClient() {
     setPacks((current) => current.map((pack) => pack.id === packId ? updated : pack));
     setSelectedId(packId);
     setMessage(success);
+  }
+
+  async function archivePack(pack: ContentPack, archived: boolean) {
+    await patchPack(pack.id, { archived }, archived ? "Content pack archived." : "Content pack restored.");
+  }
+
+  async function deletePack(pack: ContentPack) {
+    setBusy(`${pack.id}:delete`);
+    setMessage("");
+    const response = await authedFetch(`/api/content-packs/${pack.id}`, { method: "DELETE" });
+    const data = await readApiResponse(response);
+    setBusy("");
+    if (!response.ok) {
+      setMessage(typeof data.error === "string" ? data.error : "Unable to delete content pack.");
+      return;
+    }
+    setPacks((current) => current.filter((item) => item.id !== pack.id));
+    setSelectedId((current) => current === pack.id ? "" : current);
+    setMessage("Content pack deleted permanently.");
   }
 
   async function regenerate(packId: string, sectionKey: ContentPackSectionKey) {
@@ -620,6 +646,10 @@ export function ApprovalReviewClient() {
             </span>
           </label>
         </div>
+        <label className="mt-4 flex items-center gap-2 text-sm font-bold text-[#6f766f]">
+          <input type="checkbox" checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} />
+          Show Archived
+        </label>
       </section>
 
       {message && <p className="rounded-2xl bg-[#eef3ec] p-4 text-sm font-semibold text-[#4f6f5a]">{message}</p>}
@@ -653,6 +683,9 @@ export function ApprovalReviewClient() {
               scheduleDate={scheduleDate}
               setScheduleDate={setScheduleDate}
               onSchedule={() => schedule(pack)}
+              onArchive={() => archivePack(pack, true)}
+              onRestore={() => archivePack(pack, false)}
+              onDelete={() => deletePack(pack)}
             />
           )) : (
             <div className="rounded-3xl border border-dashed border-[#d8c28a] bg-white p-8 text-center">
@@ -743,7 +776,7 @@ function FilterSelect({ label, value, onChange, options }: { label: string; valu
   );
 }
 
-function PackReviewCard({ pack, selected, busy, onSelect, onApprove, onDraft, onNeedsReview, onCanva, onDesignStarted, onDesigned, scheduleDate, setScheduleDate, onSchedule }: {
+function PackReviewCard({ pack, selected, busy, onSelect, onApprove, onDraft, onNeedsReview, onCanva, onDesignStarted, onDesigned, scheduleDate, setScheduleDate, onSchedule, onArchive, onRestore, onDelete }: {
   pack: ContentPack;
   selected: boolean;
   busy: boolean;
@@ -757,6 +790,9 @@ function PackReviewCard({ pack, selected, busy, onSelect, onApprove, onDraft, on
   scheduleDate: string;
   setScheduleDate: (value: string) => void;
   onSchedule: () => void;
+  onArchive: () => void;
+  onRestore: () => void;
+  onDelete: () => void;
 }) {
   return (
     <article className={`rounded-3xl border bg-white p-5 shadow-sm ${selected ? "border-[#b89b5e] ring-4 ring-[#eadfc8]" : "border-[#e9dfcf]"}`}>
@@ -769,6 +805,7 @@ function PackReviewCard({ pack, selected, busy, onSelect, onApprove, onDraft, on
           </div>
           <h3 className="mt-4 text-2xl font-bold leading-tight text-[#172a3a]">{pack.title}</h3>
           <p className="mt-2 text-sm leading-6 text-[#6f766f]">{pack.audience || "LionHeart audience"} · {[pack.product_tie_in, pack.service_tie_in].filter(Boolean).join(" · ") || "CTA review needed"}</p>
+          {isPackArchived(pack) ? <p className="mt-2 text-xs font-bold uppercase tracking-wide text-[#8a6926]">Archived</p> : null}
         </button>
         <Link className="btn-secondary shrink-0" href={`/content-packs/${pack.id}`}><Edit3 size={16} />Edit Content</Link>
       </div>
@@ -788,6 +825,13 @@ function PackReviewCard({ pack, selected, busy, onSelect, onApprove, onDraft, on
         <button className="btn-secondary" onClick={onSchedule} disabled={busy}><CalendarPlus size={16} />Schedule</button>
         <button className="btn-secondary" onClick={onDesignStarted} disabled={busy}><Palette size={16} />Mark Design Started</button>
         <button className="btn-secondary border-[#d8c28a] text-[#77633c]" onClick={onDesigned} disabled={busy}><Palette size={16} />Mark Designed</button>
+        <ContentLifecycleActions
+          archived={isPackArchived(pack)}
+          busy={busy}
+          onArchive={onArchive}
+          onRestore={onRestore}
+          onDelete={onDelete}
+        />
       </div>
     </article>
   );

@@ -134,6 +134,7 @@ export type GeneratedContent = {
   media_status?: MediaStatus | null;
   canva_design_url?: string | null;
   canva_template_id?: string | null;
+  archived?: boolean | null;
   created_at?: string;
   updated_at?: string;
 };
@@ -224,6 +225,7 @@ export type ContentPack = {
   pack: ContentPackBody;
   canva_brief?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
+  archived?: boolean | null;
   created_at?: string;
   updated_at?: string;
 };

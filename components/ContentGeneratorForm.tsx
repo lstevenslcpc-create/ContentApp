@@ -28,6 +28,7 @@ export function ContentGeneratorForm() {
   const [posts, setPosts] = useState<GeneratedContent[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
 
   async function submit(formData: FormData) {
     setLoading(true);
@@ -61,6 +62,8 @@ export function ContentGeneratorForm() {
     }
   }
 
+  const visiblePosts = posts.filter((post) => showArchived || !post.archived);
+
   return (
     <div className="grid gap-6 xl:grid-cols-[380px_1fr]">
       <form action={submit} className="h-fit rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -76,7 +79,22 @@ export function ContentGeneratorForm() {
         </div>
       </form>
       <div className="space-y-4">
-        {posts.length ? posts.map((post) => <ContentCard key={post.id} item={post} />) : <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-500">Generated posts will appear here for review, approval, copying, scheduling, and manual posting.</div>}
+        {posts.length ? (
+          <div className="flex justify-end">
+            <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
+              <input type="checkbox" checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} />
+              Show Archived
+            </label>
+          </div>
+        ) : null}
+        {visiblePosts.length ? visiblePosts.map((post) => (
+          <ContentCard
+            key={post.id}
+            item={post}
+            onUpdate={(updated) => setPosts((current) => current.map((item) => item.id === updated.id ? updated : item))}
+            onRemove={(id) => setPosts((current) => current.filter((item) => item.id !== id))}
+          />
+        )) : <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-500">Generated posts will appear here for review, approval, copying, scheduling, and manual posting.</div>}
       </div>
     </div>
   );
