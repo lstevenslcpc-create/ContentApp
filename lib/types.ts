@@ -135,8 +135,39 @@ export type GeneratedContent = {
   canva_design_url?: string | null;
   canva_template_id?: string | null;
   archived?: boolean | null;
+  content_intelligence_brief?: ContentIntelligenceBrief | null;
+  why_this_works?: ContentWhyThisWorks | null;
   created_at?: string;
   updated_at?: string;
+};
+
+export type ContentIntelligenceBrief = {
+  topic_definition: string;
+  psychological_explanation: string;
+  common_symptoms: string[];
+  hidden_signs: string[];
+  emotional_experience: string;
+  real_life_examples: string[];
+  behavioral_patterns: string[];
+  nervous_system_signs: string[];
+  common_myths: string[];
+  therapist_insight: string;
+  observer_notes: string;
+  practical_takeaway: string;
+  best_fit_cta: string;
+  audience_insight: string;
+  psychological_angle: string;
+  cta_strategy: string;
+  suggested_template: string;
+  source_notes?: string[];
+};
+
+export type ContentWhyThisWorks = {
+  goal_used: string;
+  audience_insight: string;
+  psychological_angle: string;
+  cta_strategy: string;
+  suggested_template: string;
 };
 
 export type PlatformAngles = {

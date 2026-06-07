@@ -81,6 +81,8 @@ export function ContentCard({ item, onUpdate, onRemove }: { item: GeneratedConte
     setMessage([data.error || "Unable to send this content to Approval Review.", Array.isArray(data.issues) ? data.issues.join(" ") : ""].filter(Boolean).join(" "));
   }
 
+  const whyThisWorks = item.why_this_works;
+
   return (
     <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -96,6 +98,33 @@ export function ContentCard({ item, onUpdate, onRemove }: { item: GeneratedConte
       {!!item.hashtags?.length && <p className="mt-3 text-sm font-semibold text-slate-600">{item.hashtags.join(" ")}</p>}
       {item.visual_idea && <p className="mt-4 rounded-lg bg-slate-50 p-3 text-sm text-slate-700"><b>Suggested visual:</b> {item.visual_idea}</p>}
       {item.script && <p className="mt-3 rounded-lg bg-blue-50 p-3 text-sm text-blue-950"><b>Short script:</b> {item.script}</p>}
+      {whyThisWorks && (
+        <details className="mt-4 rounded-xl border border-[#e7ddca] bg-[#fffaf1] p-4 text-sm text-[#24384a]">
+          <summary className="cursor-pointer text-sm font-bold text-ink">Why this content works</summary>
+          <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div>
+              <dt className="text-xs font-bold uppercase tracking-wide text-[#8a7143]">Goal used</dt>
+              <dd className="mt-1 leading-6">{whyThisWorks.goal_used}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-bold uppercase tracking-wide text-[#8a7143]">Suggested template</dt>
+              <dd className="mt-1 leading-6">{whyThisWorks.suggested_template}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-bold uppercase tracking-wide text-[#8a7143]">Audience insight</dt>
+              <dd className="mt-1 leading-6">{whyThisWorks.audience_insight}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-bold uppercase tracking-wide text-[#8a7143]">Psychological angle</dt>
+              <dd className="mt-1 leading-6">{whyThisWorks.psychological_angle}</dd>
+            </div>
+            <div className="sm:col-span-2">
+              <dt className="text-xs font-bold uppercase tracking-wide text-[#8a7143]">CTA strategy</dt>
+              <dd className="mt-1 leading-6">{whyThisWorks.cta_strategy}</dd>
+            </div>
+          </dl>
+        </details>
+      )}
       {item.media_url && (
         <a href={item.media_url} target="_blank" className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-brand">
           Open generated media <ExternalLink size={14} />

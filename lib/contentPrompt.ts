@@ -1,96 +1,6 @@
-import type { BrandBrain, BusinessProfile, ContentGenerationRequest } from "./types";
+import type { BrandBrain, BusinessProfile, ContentGenerationRequest, ContentIntelligenceBrief } from "./types";
 import { formatBrandBrainForPrompt } from "./brandBrain/format";
-
-const goalStrategies: Record<string, { hook: string; cta: string; template: string }> = {
-  leads: {
-    hook: "Use a problem-aware hook that names the audience's current pain and builds trust quickly.",
-    cta: "Use a soft inquiry CTA that invites the reader to book, message, or take the next step without pressure.",
-    template: "Choose a trust-building carousel, service explainer, or simple consultation CTA layout."
-  },
-  education: {
-    hook: "Use a clear teaching hook that answers a question, explains a pattern, or corrects a misconception.",
-    cta: "Use a save-for-later or learn-more CTA.",
-    template: "Choose an educational carousel, infographic, blog graphic, or nervous-system explainer template."
-  },
-  "trust-building": {
-    hook: "Use a validating hook that helps the audience feel understood before teaching.",
-    cta: "Use a gentle relationship-building CTA that invites reflection, saving, sharing, or reaching out when ready.",
-    template: "Choose an emotional hook carousel, therapist education carousel, or calm quote-style template."
-  },
-  promotion: {
-    hook: "Use a benefit-led hook that connects the offer to a specific emotional or practical problem.",
-    cta: "Use a clear product, service, or booking CTA while keeping the tone ethical and non-pushy.",
-    template: "Choose a product promo, workbook promo, service promo, or offer-focused layout."
-  },
-  testimonials: {
-    hook: "Use a credibility hook focused on transformation, reassurance, or what support can make possible.",
-    cta: "Use a trust-forward CTA that invites the reader to explore whether the support fits them.",
-    template: "Choose a testimonial-style card, story post, quote post, or trust-building carousel."
-  },
-  awareness: {
-    hook: "Use an accessible recognition hook that introduces the topic to people who may not have named it yet.",
-    cta: "Use a share, save, or learn-more CTA.",
-    template: "Choose a broad awareness carousel, infographic, or platform-native short-form layout."
-  },
-  "follower-growth": {
-    hook: "Use an emotionally specific, social-native recognition hook that names a tiny lived moment, body reaction, inner dialogue, or relationship trigger. Avoid broad questions.",
-    cta: "Prioritize saves, shares, comments, and following before any therapy or service promotion.",
-    template: "Choose an Emotional Hook Carousel, creator-native carousel, text-message style post, Reel cover, or recognition-based Canva template."
-  },
-  engagement: {
-    hook: "Use a conversational hook with a tension, question, or inner-dialogue moment that invites response.",
-    cta: "Use a comment CTA that is clinically safe and easy to answer.",
-    template: "Choose a discussion-style carousel, Threads prompt, poll-style story, or short Reel cover."
-  },
-  saves: {
-    hook: "Use a practical, list-based, or recognition hook that feels worth keeping.",
-    cta: "Use an explicit save-this CTA connected to future use.",
-    template: "Choose a checklist, symptom list, coping tool, carousel, or Pinterest infographic template."
-  },
-  shares: {
-    hook: "Use a 'send this to someone who...' hook or a shared-experience hook with emotional specificity.",
-    cta: "Use a share/send CTA that feels supportive, not performative.",
-    template: "Choose a quote post, recognition carousel, emotional hook carousel, or text-message style layout."
-  },
-  "reach-awareness": {
-    hook: "Use a broad but emotionally sharp hook that can travel beyond the existing audience.",
-    cta: "Use a low-friction CTA such as share, save, follow, or read more.",
-    template: "Choose a visually simple awareness post, Reel cover, Pinterest pin, or infographic."
-  },
-  "community-building": {
-    hook: "Use a belonging-focused hook that names a shared experience without overgeneralizing.",
-    cta: "Use a gentle community CTA such as 'tell me if this resonates' or 'save for a steadier moment.'",
-    template: "Choose a warm carousel, Threads post, story prompt, or therapist-authored reflection template."
-  },
-  "thought-leadership": {
-    hook: "Use a nuanced perspective hook that challenges a common assumption with clinical clarity.",
-    cta: "Use a credibility-building CTA that invites deeper reading, newsletter signup, or consultation.",
-    template: "Choose an editorial carousel, blog/SEO pin, LinkedIn-style post, or therapist education template."
-  },
-  "email-list-growth": {
-    hook: "Use a resource-led hook that gives the audience a reason to want a deeper guide or download.",
-    cta: "Use a lead magnet or newsletter signup CTA.",
-    template: "Choose a lead magnet promo, workbook preview, Pinterest pin, or newsletter graphic template."
-  },
-  "therapy-inquiries": {
-    hook: "Use a service-fit hook that names when therapy support may be helpful without diagnosing.",
-    cta: "Use a soft therapy inquiry CTA for consultation, contact, or learning about services.",
-    template: "Choose a service promo, therapist education carousel, or consultation CTA layout."
-  },
-  "product-sales": {
-    hook: "Use a problem-to-support hook that connects the product to a specific emotional need or daily use case.",
-    cta: "Use a clear product CTA that explains the next step and keeps claims realistic.",
-    template: "Choose a workbook/product promo, Pinterest product pin, carousel, or clean product feature layout."
-  }
-};
-
-function contentGoalStrategy(goal: string) {
-  return goalStrategies[goal] || {
-    hook: "Use a goal-aligned hook that feels specific, human, and platform-native.",
-    cta: "Use a CTA that directly supports the selected content goal.",
-    template: "Choose the Canva or visual template that best supports the selected goal."
-  };
-}
+import { formatContentGoalForPrompt } from "./contentGoalConfig";
 
 function followerGrowthInstructions(request: ContentGenerationRequest) {
   if (request.contentGoal !== "follower-growth") return "";
@@ -116,9 +26,35 @@ Follower-growth rules:
 `;
 }
 
-export function buildContentPrompt(profile: BusinessProfile, request: ContentGenerationRequest, brandBrain?: BrandBrain | null) {
-  const strategy = contentGoalStrategy(request.contentGoal);
+function formatResearchBriefForPrompt(brief?: ContentIntelligenceBrief | null) {
+  if (!brief) return "";
 
+  return `
+Content Research + Depth Brief:
+- Topic definition: ${brief.topic_definition}
+- Psychological explanation: ${brief.psychological_explanation}
+- Common symptoms: ${brief.common_symptoms.join(", ")}
+- Hidden or less obvious signs: ${brief.hidden_signs.join(", ")}
+- Emotional experience: ${brief.emotional_experience}
+- Real-life examples: ${brief.real_life_examples.join(" | ")}
+- Behavioral patterns: ${brief.behavioral_patterns.join(", ")}
+- Nervous system or body-based signs: ${brief.nervous_system_signs.join(", ")}
+- Common myths or misunderstandings: ${brief.common_myths.join(" | ")}
+- What a therapist would want people to understand: ${brief.therapist_insight}
+- What parents, partners, or clients may notice: ${brief.observer_notes}
+- Practical takeaway: ${brief.practical_takeaway}
+- Best-fit CTA based on content goal: ${brief.best_fit_cta}
+- Audience insight: ${brief.audience_insight}
+- Psychological angle: ${brief.psychological_angle}
+- CTA strategy: ${brief.cta_strategy}
+- Suggested template: ${brief.suggested_template}
+- Source notes: ${(brief.source_notes || []).join(" | ") || "Built-in clinical knowledge brief. Web research not enabled."}
+
+Use this brief as mandatory source context. The final post should feel researched, therapist-led, emotionally specific, and differentiated by the content goal.
+`;
+}
+
+export function buildContentPrompt(profile: BusinessProfile, request: ContentGenerationRequest, brandBrain?: BrandBrain | null, researchBrief?: ContentIntelligenceBrief | null) {
   return `
 You are an expert small-business content strategist. Generate ${request.numberOfPosts} ready-to-review ${request.contentType} idea(s) for ${request.platform}.
 
@@ -135,14 +71,12 @@ Business:
 
 Primary content topic: ${request.topic}
 Content goal: ${request.contentGoal}
-Goal strategy:
-- Hook style: ${strategy.hook}
-- CTA style: ${strategy.cta}
-- Template selection direction: ${strategy.template}
+${formatContentGoalForPrompt(request.contentGoal)}
 ${followerGrowthInstructions(request)}
+${formatResearchBriefForPrompt(researchBrief)}
 
 ${request.intelligenceBrief ? `
-Content Intelligence Brief:
+Saved Content Opportunity Brief:
 - Topic: ${request.intelligenceBrief.topic}
 - Audience: ${request.intelligenceBrief.audience}
 - Content pillar: ${request.intelligenceBrief.content_pillar}
@@ -166,6 +100,11 @@ ${formatBrandBrainForPrompt(brandBrain)}
 
 Content rules:
 - Make outputs feel deeply customized to ${brandBrain?.brand_name || profile.business_name}, never generic wellness AI.
+- Write from the Content Research + Depth Brief before writing the final post.
+- Include specific symptoms, emotions, body cues, behaviors, myths, real-life examples, and therapist-level insight when relevant.
+- Do not flatten the topic into broad mental health education. Name the exact moment, body response, relationship cue, parent-child example, or hidden behavior.
+- Hooks must pull from the brief's real-life examples, hidden signs, nervous system signs, or observer notes. Do not write broad reassurance hooks.
+- Avoid generic openers such as "you are not alone", "does this sound familiar", "many people struggle with", "it is okay to", or "mental health matters".
 - Use the Brand Brain's audience profiles, therapy services, product catalog, SEO priorities, safety rules, visual identity, and CTA preferences.
 - Do not use forbidden AI phrases or generic therapy clichés.
 - Avoid em dashes completely. Do not use — in any generated content. Replace em dashes with periods, commas, colons, or shorter sentences.
@@ -177,6 +116,13 @@ Content rules:
 - Include the recommended Canva/template direction inside visual_idea so it can be used during design prep.
 - For follower-growth, keep service or therapy promotion secondary unless the user explicitly selected leads or therapy-inquiries.
 - For follower-growth, captions should feel like a therapist creator naming a familiar emotional pattern, then inviting saves, shares, comments, or follows.
+- For trust-building, use psychoeducation plus real-life examples so the audience thinks, "This therapist gets it." Avoid product selling.
+- For trust-building, start with a concrete observation such as irritability after school, "I am fine" behavior, stomach aches before school, tone scanning, avoidance, perfectionism, or reassurance seeking. Then explain what may be happening underneath.
+- For education, teach what this means, why it happens, and what helps.
+- For saves, use signs, scripts, steps, checklists, coping tools, or frameworks.
+- For shares, make the content feel easy to send to someone who needs the language.
+- For leads or therapy-inquiries, softly connect the pattern to what therapy support can help with.
+- For product-sales, connect pain point to product benefit and CTA clearly.
 
 Return strict JSON only with this shape:
 {
@@ -186,11 +132,19 @@ Return strict JSON only with this shape:
       "caption": "Platform-specific caption with clear value, simple explanation, and CTA. For follower-growth, prioritize relatability, saves, shares, comments, and follows before therapy promotion. Avoid generic filler and guaranteed lead claims.",
       "hashtags": ["#Example"],
       "visual_idea": "Specific visual or Canva-ready creative direction, including suggested Canva template when relevant",
-      "script": "Short script for Reels/TikTok/Shorts, or empty string for non-video formats"
+      "script": "Short script for Reels/TikTok/Shorts, or empty string for non-video formats",
+      "content_intelligence_brief_summary": "Short review summary of the topic depth used in this post",
+      "why_this_works": {
+        "goal_used": "${request.contentGoal}",
+        "audience_insight": "Why this will feel relevant to the intended audience",
+        "psychological_angle": "The clinical or emotional pattern behind the content",
+        "cta_strategy": "Why the CTA fits the selected content goal",
+        "suggested_template": "Best Canva/template direction"
+      }
     }
   ]
 }
 
-Every post must be client-focused, specific to the business, clinically safe, and ready for manual posting after review.
+Every post must be client-focused, specific to the business, clinically safe, and ready for manual posting after review. Avoid em dashes in every field.
 `;
 }

@@ -73,6 +73,8 @@ function titleFromGeneratedContent(item: GeneratedContent) {
 
 function generatedContentPackBody(item: GeneratedContent) {
   const topic = titleFromGeneratedContent(item);
+  const whyThisWorks = item.why_this_works;
+  const brief = item.content_intelligence_brief;
   const caption = item.caption || "";
   const hashtags = item.hashtags?.length ? item.hashtags.join(" ") : "";
   const visual = item.visual_idea || "Use a calm LionHeart Therapy Canva layout with soft cream, muted navy, sage, and emotionally grounded spacing.";
@@ -81,10 +83,10 @@ function generatedContentPackBody(item: GeneratedContent) {
   const carouselCopy = item.content_type === "carousel"
     ? [
         `Slide 1: ${item.hook || topic}`,
-        "Slide 2: Name the moment or pattern the audience recognizes.",
-        "Slide 3: Explain what may be happening internally.",
-        "Slide 4: Offer a grounded reframe.",
-        "Slide 5: Give one small reflection or next step.",
+        `Slide 2: ${brief?.hidden_signs?.[0] || "Name the moment or pattern the audience recognizes."}`,
+        `Slide 3: ${brief?.psychological_explanation || "Explain what may be happening internally."}`,
+        `Slide 4: ${brief?.therapist_insight || "Offer a grounded reframe."}`,
+        `Slide 5: ${brief?.practical_takeaway || "Give one small reflection or next step."}`,
         `Slide 6: ${cta}`
       ].join("\n")
     : "";
@@ -97,7 +99,7 @@ function generatedContentPackBody(item: GeneratedContent) {
     pinterest_pin_title: `${topic}: therapist-informed reflection`,
     pinterest_description: caption || `A LionHeart Therapy post about ${topic}, created for review and manual publishing.`,
     threads_post: caption ? caption.split("\n").filter(Boolean).slice(0, 2).join("\n") : item.hook || topic,
-    blog_outline: `H1: ${topic}\nSection 1: What this can look like\nSection 2: Why it can feel so intense\nSection 3: A grounded next step\nCTA: ${cta}`,
+    blog_outline: `H1: ${topic}\nSection 1: What this can look like\nSection 2: ${whyThisWorks?.psychological_angle || "Why it can feel so intense"}\nSection 3: ${brief?.practical_takeaway || "A grounded next step"}\nCTA: ${cta}`,
     email_newsletter_blurb: caption || `A short therapist-authored note about ${topic}.`,
     canva_visual_direction: visual,
     product_cta: "",
@@ -127,7 +129,9 @@ function generatedContentPackRow(userId: string, item: GeneratedContent) {
       platform: item.platform || null,
       contentType: item.content_type || null,
       contentGoal: item.content_goal || null,
-      originalStatus: item.status || null
+      originalStatus: item.status || null,
+      contentIntelligenceBrief: item.content_intelligence_brief || null,
+      whyThisWorks: item.why_this_works || null
     }
   };
 }

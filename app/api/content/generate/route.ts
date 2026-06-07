@@ -50,22 +50,43 @@ export async function POST(request: Request) {
       hashtags: post.hashtags,
       visual_idea: post.visual_idea,
       script: post.script || null,
+      content_intelligence_brief: post.content_intelligence_brief || null,
+      why_this_works: post.why_this_works || null,
       status: "needs_review",
       media_status: "not_started"
     }));
 
     const { data, error } = await supabase.from("generated_content").insert(rows).select("*");
-    if (error && /topic/i.test(error.message || "")) {
-      const fallbackRows = rows.map(({ topic: _topic, ...row }) => row);
+    if (error && /(topic|content_intelligence_brief|why_this_works)/i.test(error.message || "")) {
+      const fallbackRows = rows.map((row) => {
+        const {
+          topic: _topic,
+          content_intelligence_brief: _contentIntelligenceBrief,
+          why_this_works: _whyThisWorks,
+          ...fallbackRow
+        } = row;
+        return fallbackRow;
+      });
       const retry = await supabase.from("generated_content").insert(fallbackRows).select("*");
       if (retry.error) throw retry.error;
       return NextResponse.json({
-        posts: (retry.data || []).map((post) => ({ ...post, topic })),
-        warning: "Content generated, but the generated_content.topic column is missing in Supabase. Run the latest schema migration to save topics permanently."
+        posts: (retry.data || []).map((post, index) => ({
+          ...post,
+          topic,
+          content_intelligence_brief: posts[index]?.content_intelligence_brief || null,
+          why_this_works: posts[index]?.why_this_works || null
+        })),
+        warning: `Content generated, but Supabase is missing one of the latest generated_content columns: ${error.message}`
       });
     }
     if (error) throw error;
-    return NextResponse.json({ posts: data });
+    return NextResponse.json({
+      posts: (data || []).map((post, index) => ({
+        ...post,
+        content_intelligence_brief: post.content_intelligence_brief || posts[index]?.content_intelligence_brief || null,
+        why_this_works: post.why_this_works || posts[index]?.why_this_works || null
+      }))
+    });
   } catch (error) {
     const authResponse = authErrorResponse(error);
     if (authResponse) return authResponse;

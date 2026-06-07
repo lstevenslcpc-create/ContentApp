@@ -1,7 +1,8 @@
 import type OpenAI from "openai";
-import type { BrandBrain, BusinessProfile, ContentGenerationRequest, ContentOpportunity, ContentPackBody } from "./types";
+import type { BrandBrain, BusinessProfile, ContentGenerationRequest, ContentIntelligenceBrief, ContentOpportunity, ContentPackBody, ContentWhyThisWorks } from "./types";
 import { buildContentPrompt } from "./contentPrompt";
 import { formatBrandBrainForPrompt } from "./brandBrain/format";
+import { buildContentIntelligenceBrief } from "./contentResearch";
 
 type GeneratedPost = {
   hook: string;
@@ -9,6 +10,9 @@ type GeneratedPost = {
   hashtags: string[];
   visual_idea: string;
   script?: string;
+  content_intelligence_brief?: ContentIntelligenceBrief;
+  content_intelligence_brief_summary?: string;
+  why_this_works?: ContentWhyThisWorks;
 };
 
 type ParsedContentOpportunities = {
@@ -433,6 +437,7 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
     throw new Error("OPENAI_API_KEY is missing. Add it to generate content.");
   }
 
+  const researchBrief = await buildContentIntelligenceBrief({ request, brandBrain });
   const client = await createOpenAiClient(process.env.OPENAI_API_KEY);
   const completion = await client.chat.completions.create({
     model: "gpt-4o-mini",
@@ -440,7 +445,7 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
     response_format: { type: "json_object" },
     messages: [
       { role: "system", content: "Return only valid JSON. Do not include markdown." },
-      { role: "user", content: buildContentPrompt(profile, request, brandBrain) }
+      { role: "user", content: buildContentPrompt(profile, request, brandBrain, researchBrief) }
     ]
   });
 
@@ -454,13 +459,32 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
     throw new Error("OpenAI response did not include a posts array.");
   }
 
-  return parsed.posts.map((post) => removeEmDashesDeep({
-    hook: String(post.hook || "").trim(),
-    caption: String(post.caption || "").trim(),
-    hashtags: Array.isArray(post.hashtags) ? post.hashtags.map(String) : [],
-    visual_idea: String(post.visual_idea || "").trim(),
-    script: String(post.script || "").trim()
-  }));
+  return parsed.posts.map((post) => {
+    const whyThisWorks = post.why_this_works || {
+      goal_used: request.contentGoal,
+      audience_insight: researchBrief.audience_insight,
+      psychological_angle: researchBrief.psychological_angle,
+      cta_strategy: researchBrief.cta_strategy,
+      suggested_template: researchBrief.suggested_template
+    };
+
+    return removeEmDashesDeep({
+      hook: String(post.hook || "").trim(),
+      caption: String(post.caption || "").trim(),
+      hashtags: Array.isArray(post.hashtags) ? post.hashtags.map(String) : [],
+      visual_idea: String(post.visual_idea || "").trim(),
+      script: String(post.script || "").trim(),
+      content_intelligence_brief: researchBrief,
+      content_intelligence_brief_summary: String(post.content_intelligence_brief_summary || researchBrief.practical_takeaway).trim(),
+      why_this_works: {
+        goal_used: String(whyThisWorks.goal_used || request.contentGoal),
+        audience_insight: String(whyThisWorks.audience_insight || researchBrief.audience_insight),
+        psychological_angle: String(whyThisWorks.psychological_angle || researchBrief.psychological_angle),
+        cta_strategy: String(whyThisWorks.cta_strategy || researchBrief.cta_strategy),
+        suggested_template: String(whyThisWorks.suggested_template || researchBrief.suggested_template)
+      }
+    });
+  });
 }
 
 export async function generateContentPack(opportunity: ContentOpportunity, brandBrain?: BrandBrain | null, sectionFocus?: string): Promise<ParsedContentPack> {
