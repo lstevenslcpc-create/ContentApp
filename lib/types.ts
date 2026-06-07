@@ -144,6 +144,10 @@ export type GeneratedContent = {
 
 export type ContentIntelligenceBrief = {
   content_angle?: string;
+  selectedFramework?: string;
+  whyThisFrameworkFits?: string;
+  frameworkExplanation?: string;
+  practicalApplication?: string;
   topic_definition: string;
   psychological_explanation: string;
   common_symptoms: string[];
@@ -170,6 +174,9 @@ export type ContentWhyThisWorks = {
   psychological_angle: string;
   cta_strategy: string;
   suggested_template: string;
+  selected_framework?: string;
+  framework_explanation?: string;
+  practical_application?: string;
 };
 
 export type PlatformAngles = {

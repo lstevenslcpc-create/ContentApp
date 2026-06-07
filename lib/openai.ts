@@ -4,6 +4,7 @@ import { buildContentPrompt } from "./contentPrompt";
 import { formatBrandBrainForPrompt } from "./brandBrain/format";
 import { buildContentIntelligenceBrief } from "./contentResearch";
 import { selectAnglesForGeneration } from "./contentAngles";
+import { buildFrameworkBrief } from "./psychologyFrameworkEngine";
 
 type GeneratedPost = {
   hook: string;
@@ -12,6 +13,10 @@ type GeneratedPost = {
   hashtags: string[];
   visual_idea: string;
   script?: string;
+  selectedFramework?: string;
+  whyThisFrameworkFits?: string;
+  frameworkExplanation?: string;
+  practicalApplication?: string;
   content_intelligence_brief?: ContentIntelligenceBrief;
   content_intelligence_brief_summary?: string;
   why_this_works?: ContentWhyThisWorks;
@@ -434,6 +439,23 @@ function normalizeContentPack(value: unknown, opportunity: ContentOpportunity) {
   return { pack: removeEmDashesDeep(pack), warnings };
 }
 
+function fallbackGeneratedPost(request: ContentGenerationRequest, researchBrief: ContentIntelligenceBrief, contentAngle: string, selectedFramework: string, frameworkExplanation: string, practicalApplication: string): GeneratedPost {
+  const hook = `${contentAngle}: what ${request.topic} can look like beneath the surface`;
+  return {
+    hook,
+    content_angle: contentAngle,
+    caption: `${hook}\n\n${frameworkExplanation}\n\nA therapist would want you to notice the pattern without turning it into shame. ${practicalApplication}\n\n${researchBrief.best_fit_cta}`,
+    hashtags: ["#LionHeartTherapy", "#MentalHealthEducation", `#${String(request.topic || "therapy").replace(/\s+/g, "")}`],
+    visual_idea: `${researchBrief.suggested_template}. Use the ${contentAngle} angle with a calm, therapist-led visual hierarchy.`,
+    script: "",
+    selectedFramework,
+    whyThisFrameworkFits: `${selectedFramework} gives this ${contentAngle} post a clear teaching structure.`,
+    frameworkExplanation,
+    practicalApplication,
+    content_intelligence_brief_summary: researchBrief.practical_takeaway
+  };
+}
+
 export async function generateStructuredContent(profile: BusinessProfile, request: ContentGenerationRequest, brandBrain?: BrandBrain | null): Promise<GeneratedPost[]> {
   if (!process.env.OPENAI_API_KEY) {
     throw new Error("OPENAI_API_KEY is missing. Add it to generate content.");
@@ -441,6 +463,7 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
 
   const researchBrief = await buildContentIntelligenceBrief({ request, brandBrain });
   const plannedAngles = selectAnglesForGeneration(request.topic, request.contentGoal, request.numberOfPosts || 1);
+  const frameworkBriefs = plannedAngles.map((angle) => buildFrameworkBrief(request.topic, angle.name, request.contentGoal));
   const client = await createOpenAiClient(process.env.OPENAI_API_KEY);
   const completion = await client.chat.completions.create({
     model: "gpt-4o-mini",
@@ -448,7 +471,7 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
     response_format: { type: "json_object" },
     messages: [
       { role: "system", content: "Return only valid JSON. Do not include markdown." },
-      { role: "user", content: buildContentPrompt(profile, request, brandBrain, researchBrief, plannedAngles) }
+      { role: "user", content: buildContentPrompt(profile, request, brandBrain, researchBrief, plannedAngles, frameworkBriefs) }
     ]
   });
 
@@ -462,14 +485,31 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
     throw new Error("OpenAI response did not include a posts array.");
   }
 
-  return parsed.posts.map((post, index) => {
+  const postInputs = plannedAngles.map((angle, index) => parsed.posts?.[index] || fallbackGeneratedPost(
+    request,
+    researchBrief,
+    angle.name,
+    frameworkBriefs[index]?.selectedFramework || "CBT Thought-Feeling-Behavior Cycle",
+    frameworkBriefs[index]?.frameworkExplanation || researchBrief.psychological_explanation,
+    frameworkBriefs[index]?.practicalApplication || researchBrief.practical_takeaway
+  ));
+
+  return postInputs.map((post, index) => {
     const contentAngle = String(post.content_angle || plannedAngles[index]?.name || plannedAngles[0]?.name || "Therapist Perspective").trim();
+    const frameworkBrief = frameworkBriefs[index] || buildFrameworkBrief(request.topic, contentAngle, request.contentGoal);
+    const selectedFramework = String(post.selectedFramework || frameworkBrief.selectedFramework);
+    const frameworkExplanation = String(post.frameworkExplanation || frameworkBrief.frameworkExplanation);
+    const practicalApplication = String(post.practicalApplication || frameworkBrief.practicalApplication);
+    const whyThisFrameworkFits = String(post.whyThisFrameworkFits || frameworkBrief.whyThisFrameworkFits);
     const whyThisWorks = post.why_this_works || {
       goal_used: request.contentGoal,
       audience_insight: researchBrief.audience_insight,
       psychological_angle: `${contentAngle}: ${researchBrief.psychological_angle}`,
       cta_strategy: researchBrief.cta_strategy,
-      suggested_template: researchBrief.suggested_template
+      suggested_template: researchBrief.suggested_template,
+      selected_framework: selectedFramework,
+      framework_explanation: frameworkExplanation,
+      practical_application: practicalApplication
     };
 
     return removeEmDashesDeep({
@@ -479,14 +519,28 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
       hashtags: Array.isArray(post.hashtags) ? post.hashtags.map(String) : [],
       visual_idea: String(post.visual_idea || "").trim(),
       script: String(post.script || "").trim(),
-      content_intelligence_brief: { ...researchBrief, content_angle: contentAngle },
+      selectedFramework,
+      whyThisFrameworkFits,
+      frameworkExplanation,
+      practicalApplication,
+      content_intelligence_brief: {
+        ...researchBrief,
+        content_angle: contentAngle,
+        selectedFramework,
+        whyThisFrameworkFits,
+        frameworkExplanation,
+        practicalApplication
+      },
       content_intelligence_brief_summary: String(post.content_intelligence_brief_summary || researchBrief.practical_takeaway).trim(),
       why_this_works: {
         goal_used: String(whyThisWorks.goal_used || request.contentGoal),
         audience_insight: String(whyThisWorks.audience_insight || researchBrief.audience_insight),
         psychological_angle: String(whyThisWorks.psychological_angle || researchBrief.psychological_angle),
         cta_strategy: String(whyThisWorks.cta_strategy || researchBrief.cta_strategy),
-        suggested_template: String(whyThisWorks.suggested_template || researchBrief.suggested_template)
+        suggested_template: String(whyThisWorks.suggested_template || researchBrief.suggested_template),
+        selected_framework: String(whyThisWorks.selected_framework || selectedFramework),
+        framework_explanation: String(whyThisWorks.framework_explanation || frameworkExplanation),
+        practical_application: String(whyThisWorks.practical_application || practicalApplication)
       }
     });
   });

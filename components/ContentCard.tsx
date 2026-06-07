@@ -121,10 +121,28 @@ export function ContentCard({ item, onUpdate, onRemove }: { item: GeneratedConte
               <dt className="text-xs font-bold uppercase tracking-wide text-[#8a7143]">Psychological angle</dt>
               <dd className="mt-1 leading-6">{whyThisWorks.psychological_angle}</dd>
             </div>
+            {whyThisWorks.selected_framework && (
+              <div>
+                <dt className="text-xs font-bold uppercase tracking-wide text-[#8a7143]">Framework</dt>
+                <dd className="mt-1 leading-6">{whyThisWorks.selected_framework}</dd>
+              </div>
+            )}
             <div className="sm:col-span-2">
               <dt className="text-xs font-bold uppercase tracking-wide text-[#8a7143]">CTA strategy</dt>
               <dd className="mt-1 leading-6">{whyThisWorks.cta_strategy}</dd>
             </div>
+            {whyThisWorks.framework_explanation && (
+              <div className="sm:col-span-2">
+                <dt className="text-xs font-bold uppercase tracking-wide text-[#8a7143]">Framework explanation</dt>
+                <dd className="mt-1 leading-6">{whyThisWorks.framework_explanation}</dd>
+              </div>
+            )}
+            {whyThisWorks.practical_application && (
+              <div className="sm:col-span-2">
+                <dt className="text-xs font-bold uppercase tracking-wide text-[#8a7143]">Practical application</dt>
+                <dd className="mt-1 leading-6">{whyThisWorks.practical_application}</dd>
+              </div>
+            )}
           </dl>
         </details>
       )}

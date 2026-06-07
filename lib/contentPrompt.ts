@@ -1,4 +1,5 @@
 import type { ContentAngle } from "./contentAngles";
+import type { FrameworkBrief } from "./psychologyFrameworkEngine";
 import type { BrandBrain, BusinessProfile, ContentGenerationRequest, ContentIntelligenceBrief } from "./types";
 import { formatBrandBrainForPrompt } from "./brandBrain/format";
 import { formatContentGoalForPrompt } from "./contentGoalConfig";
@@ -33,6 +34,10 @@ function formatResearchBriefForPrompt(brief?: ContentIntelligenceBrief | null) {
   return `
 Content Research + Depth Brief:
 - Primary content angle: ${brief.content_angle || "Use the assigned planned angle for each post."}
+- Selected framework: ${brief.selectedFramework || "Use the assigned psychology framework for each post."}
+- Why this framework fits: ${brief.whyThisFrameworkFits || "Framework selected per post."}
+- Framework explanation: ${brief.frameworkExplanation || "Teach through the selected framework."}
+- Practical application: ${brief.practicalApplication || "Give one grounded next step through the selected framework."}
 - Topic definition: ${brief.topic_definition}
 - Psychological explanation: ${brief.psychological_explanation}
 - Common symptoms: ${brief.common_symptoms.join(", ")}
@@ -68,7 +73,20 @@ Each generated post must use its assigned content angle exactly. Do not blend al
 `;
 }
 
-export function buildContentPrompt(profile: BusinessProfile, request: ContentGenerationRequest, brandBrain?: BrandBrain | null, researchBrief?: ContentIntelligenceBrief | null, plannedAngles: ContentAngle[] = []) {
+function formatFrameworkBriefsForPrompt(frameworkBriefs: FrameworkBrief[] = []) {
+  if (!frameworkBriefs.length) return "";
+  return `
+Required Psychology Frameworks:
+${frameworkBriefs.map((brief, index) => `Post ${index + 1}: ${brief.selectedFramework}
+- Why this framework fits: ${brief.whyThisFrameworkFits}
+- Framework explanation: ${brief.frameworkExplanation}
+- Practical application: ${brief.practicalApplication}`).join("\n")}
+
+Every post must teach through its assigned framework. Do not only name symptoms or make relatable statements.
+`;
+}
+
+export function buildContentPrompt(profile: BusinessProfile, request: ContentGenerationRequest, brandBrain?: BrandBrain | null, researchBrief?: ContentIntelligenceBrief | null, plannedAngles: ContentAngle[] = [], frameworkBriefs: FrameworkBrief[] = []) {
   return `
 You are an expert small-business content strategist. Generate ${request.numberOfPosts} ready-to-review ${request.contentType} idea(s) for ${request.platform}.
 
@@ -89,6 +107,7 @@ ${formatContentGoalForPrompt(request.contentGoal)}
 ${followerGrowthInstructions(request)}
 ${formatResearchBriefForPrompt(researchBrief)}
 ${formatPlannedAnglesForPrompt(plannedAngles)}
+${formatFrameworkBriefsForPrompt(frameworkBriefs)}
 
 ${request.intelligenceBrief ? `
 Saved Content Opportunity Brief:
@@ -138,6 +157,9 @@ Content rules:
 - For shares, make the content feel easy to send to someone who needs the language.
 - For leads or therapy-inquiries, softly connect the pattern to what therapy support can help with.
 - For product-sales, connect pain point to product benefit and CTA clearly.
+- Every post must explain the psychology behind the angle using the assigned framework. Use the framework to teach why the pattern happens, how it shows up, and what a grounded next step can look like.
+- When the assigned framework combines two frameworks, explain how both fit without becoming academic.
+- Do not use framework names as decoration only. The caption must actually teach through the framework.
 
 Return strict JSON only with this shape:
 {
@@ -149,13 +171,20 @@ Return strict JSON only with this shape:
       "hashtags": ["#Example"],
       "visual_idea": "Specific visual or Canva-ready creative direction, including suggested Canva template when relevant",
       "script": "Short script for Reels/TikTok/Shorts, or empty string for non-video formats",
+      "selectedFramework": "The exact assigned framework name or framework combination",
+      "whyThisFrameworkFits": "Why this framework fits the topic, angle, and goal",
+      "frameworkExplanation": "Short explanation of the psychology behind the post",
+      "practicalApplication": "One grounded way the audience can apply the framework",
       "content_intelligence_brief_summary": "Short review summary of the topic depth used in this post",
       "why_this_works": {
         "goal_used": "${request.contentGoal}",
         "audience_insight": "Why this will feel relevant to the intended audience",
         "psychological_angle": "The clinical or emotional pattern behind the content",
         "cta_strategy": "Why the CTA fits the selected content goal",
-        "suggested_template": "Best Canva/template direction"
+        "suggested_template": "Best Canva/template direction",
+        "selected_framework": "The selected framework",
+        "framework_explanation": "How the framework teaches the post",
+        "practical_application": "The practical application included"
       }
     }
   ]
