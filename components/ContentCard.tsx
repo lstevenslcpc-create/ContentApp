@@ -88,7 +88,10 @@ export function ContentCard({ item, onUpdate, onRemove }: { item: GeneratedConte
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-bold uppercase tracking-wide text-brand">{item.platform} · {item.content_type}</p>
-          {item.topic && <p className="mt-2 inline-flex rounded-full bg-[#f7f1e6] px-3 py-1 text-xs font-bold text-[#77633c]">Topic: {item.topic}</p>}
+          <div className="mt-2 flex flex-wrap gap-2">
+            {item.topic && <p className="inline-flex rounded-full bg-[#f7f1e6] px-3 py-1 text-xs font-bold text-[#77633c]">Topic: {item.topic}</p>}
+            {item.content_angle && <p className="inline-flex rounded-full bg-[#ede7f6] px-3 py-1 text-xs font-bold text-[#6f4ca0]">Angle: {item.content_angle}</p>}
+          </div>
           <h3 className="mt-2 text-lg font-bold text-ink">{item.hook || "Untitled content"}</h3>
         </div>
         <StatusPill status={item.status} />
@@ -155,7 +158,7 @@ export function ContentCard({ item, onUpdate, onRemove }: { item: GeneratedConte
             content_pillar: item.content_goal || null,
             linked_content_id: item.id,
             text_content: [item.hook, item.caption, item.hashtags?.join(" "), item.script].filter(Boolean).join("\n\n"),
-            tags: [item.topic, item.platform, item.content_type, item.content_goal].filter(Boolean) as string[],
+            tags: [item.topic, item.content_angle, item.platform, item.content_type, item.content_goal].filter(Boolean) as string[],
             status: "saved"
           }}
         />

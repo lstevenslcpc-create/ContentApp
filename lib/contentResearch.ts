@@ -1,5 +1,9 @@
 import type { BrandBrain, ContentGenerationRequest, ContentIntelligenceBrief } from "./types";
 import { getContentGoalConfig } from "./contentGoalConfig";
+import { getRelevantExamples } from "./realLifeExamples";
+import { getTherapistInsights } from "./therapistInsights";
+import { getRelevantPsychologyConcepts } from "./psychologyConcepts";
+import { getTopicIntelligence } from "./topicIntelligence";
 
 type BriefInput = {
   request: ContentGenerationRequest;
@@ -164,15 +168,32 @@ async function getOptionalResearchNotes(topic: string) {
 
 export async function buildContentIntelligenceBrief(input: BriefInput) {
   const brief = baseBrief(input.request, input.brandBrain);
+  const topic = String(input.request.topic || "");
+  const topicIntelligence = getTopicIntelligence(topic);
+  const examples = getRelevantExamples(topic);
+  const therapistInsights = getTherapistInsights(topic);
+  const psychologyConcepts = getRelevantPsychologyConcepts(topic);
   const sourceNotes = await getOptionalResearchNotes(String(input.request.topic || ""));
+  const conceptSummary = psychologyConcepts.map((concept) => `${concept.name}: ${concept.simpleExplanation}`);
   return {
     ...brief,
-    common_symptoms: unique(brief.common_symptoms),
-    hidden_signs: unique(brief.hidden_signs),
-    real_life_examples: unique(brief.real_life_examples),
-    behavioral_patterns: unique(brief.behavioral_patterns),
-    nervous_system_signs: unique(brief.nervous_system_signs),
-    common_myths: unique(brief.common_myths),
+    common_symptoms: unique([...brief.common_symptoms, ...(topicIntelligence?.coreSymptoms || [])]),
+    hidden_signs: unique([...brief.hidden_signs, ...(topicIntelligence?.hiddenSymptoms || [])]),
+    real_life_examples: unique([
+      ...brief.real_life_examples,
+      ...(topicIntelligence?.realLifeExamples || []),
+      ...(examples?.teenExamples || []),
+      ...(examples?.adultExamples || []),
+      ...(examples?.relationshipExamples || []),
+      ...(examples?.schoolExamples || []),
+      ...(examples?.parentingExamples || [])
+    ]),
+    behavioral_patterns: unique([...brief.behavioral_patterns, ...(topicIntelligence?.behaviors || []), ...(topicIntelligence?.relationshipPatterns || [])]),
+    nervous_system_signs: unique([...brief.nervous_system_signs, ...(topicIntelligence?.coreSymptoms || []).filter((item) => /body|stomach|head|sleep|panic|sick|heart|tight|numb|freeze/i.test(item))]),
+    common_myths: unique([...brief.common_myths, ...(topicIntelligence?.parentMisunderstandings || []), ...(therapistInsights?.commonMisconceptions || [])]),
+    therapist_insight: unique([brief.therapist_insight, ...(therapistInsights?.commonTherapistObservations || []), ...(therapistInsights?.whatTherapistsWishPeopleUnderstood || [])]).join(" "),
+    psychological_explanation: unique([brief.psychological_explanation, ...conceptSummary]).join(" "),
+    observer_notes: unique([brief.observer_notes, ...(therapistInsights?.patternsSeenInPractice || [])]).join(" "),
     source_notes: sourceNotes
   };
 }

@@ -93,7 +93,7 @@ function generatedContentPackBody(item: GeneratedContent) {
 
   return {
     tiktok_reels_script: script,
-    instagram_carousel_outline: item.content_type === "carousel" ? `Carousel for ${topic}: strong hook, recognition, emotional context, gentle reframe, CTA.` : "",
+    instagram_carousel_outline: item.content_type === "carousel" ? `Carousel for ${topic}${item.content_angle ? ` using the ${item.content_angle} angle` : ""}: strong hook, recognition, emotional context, gentle reframe, CTA.` : "",
     slide_by_slide_carousel_copy: carouselCopy,
     instagram_caption: [caption, hashtags].filter(Boolean).join("\n\n"),
     pinterest_pin_title: `${topic}: therapist-informed reflection`,
@@ -129,6 +129,7 @@ function generatedContentPackRow(userId: string, item: GeneratedContent) {
       platform: item.platform || null,
       contentType: item.content_type || null,
       contentGoal: item.content_goal || null,
+      contentAngle: item.content_angle || null,
       originalStatus: item.status || null,
       contentIntelligenceBrief: item.content_intelligence_brief || null,
       whyThisWorks: item.why_this_works || null

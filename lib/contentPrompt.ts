@@ -1,3 +1,4 @@
+import type { ContentAngle } from "./contentAngles";
 import type { BrandBrain, BusinessProfile, ContentGenerationRequest, ContentIntelligenceBrief } from "./types";
 import { formatBrandBrainForPrompt } from "./brandBrain/format";
 import { formatContentGoalForPrompt } from "./contentGoalConfig";
@@ -31,6 +32,7 @@ function formatResearchBriefForPrompt(brief?: ContentIntelligenceBrief | null) {
 
   return `
 Content Research + Depth Brief:
+- Primary content angle: ${brief.content_angle || "Use the assigned planned angle for each post."}
 - Topic definition: ${brief.topic_definition}
 - Psychological explanation: ${brief.psychological_explanation}
 - Common symptoms: ${brief.common_symptoms.join(", ")}
@@ -54,7 +56,19 @@ Use this brief as mandatory source context. The final post should feel researche
 `;
 }
 
-export function buildContentPrompt(profile: BusinessProfile, request: ContentGenerationRequest, brandBrain?: BrandBrain | null, researchBrief?: ContentIntelligenceBrief | null) {
+function formatPlannedAnglesForPrompt(angles: ContentAngle[] = []) {
+  if (!angles.length) return "";
+  return `
+Required Content Angles:
+${angles.map((angle, index) => `Post ${index + 1}: ${angle.name}
+- Angle description: ${angle.description}
+- Hook direction: ${angle.hookDirection}`).join("\n")}
+
+Each generated post must use its assigned content angle exactly. Do not blend all angles into one generic post.
+`;
+}
+
+export function buildContentPrompt(profile: BusinessProfile, request: ContentGenerationRequest, brandBrain?: BrandBrain | null, researchBrief?: ContentIntelligenceBrief | null, plannedAngles: ContentAngle[] = []) {
   return `
 You are an expert small-business content strategist. Generate ${request.numberOfPosts} ready-to-review ${request.contentType} idea(s) for ${request.platform}.
 
@@ -74,6 +88,7 @@ Content goal: ${request.contentGoal}
 ${formatContentGoalForPrompt(request.contentGoal)}
 ${followerGrowthInstructions(request)}
 ${formatResearchBriefForPrompt(researchBrief)}
+${formatPlannedAnglesForPrompt(plannedAngles)}
 
 ${request.intelligenceBrief ? `
 Saved Content Opportunity Brief:
@@ -129,6 +144,7 @@ Return strict JSON only with this shape:
   "posts": [
     {
       "hook": "Strong opening line. For follower-growth, make this a specific lived-moment hook, not a broad question.",
+      "content_angle": "The exact assigned content angle name for this post",
       "caption": "Platform-specific caption with clear value, simple explanation, and CTA. For follower-growth, prioritize relatability, saves, shares, comments, and follows before therapy promotion. Avoid generic filler and guaranteed lead claims.",
       "hashtags": ["#Example"],
       "visual_idea": "Specific visual or Canva-ready creative direction, including suggested Canva template when relevant",

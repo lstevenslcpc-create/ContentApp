@@ -3,9 +3,11 @@ import type { BrandBrain, BusinessProfile, ContentGenerationRequest, ContentInte
 import { buildContentPrompt } from "./contentPrompt";
 import { formatBrandBrainForPrompt } from "./brandBrain/format";
 import { buildContentIntelligenceBrief } from "./contentResearch";
+import { selectAnglesForGeneration } from "./contentAngles";
 
 type GeneratedPost = {
   hook: string;
+  content_angle?: string;
   caption: string;
   hashtags: string[];
   visual_idea: string;
@@ -438,6 +440,7 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
   }
 
   const researchBrief = await buildContentIntelligenceBrief({ request, brandBrain });
+  const plannedAngles = selectAnglesForGeneration(request.topic, request.contentGoal, request.numberOfPosts || 1);
   const client = await createOpenAiClient(process.env.OPENAI_API_KEY);
   const completion = await client.chat.completions.create({
     model: "gpt-4o-mini",
@@ -445,7 +448,7 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
     response_format: { type: "json_object" },
     messages: [
       { role: "system", content: "Return only valid JSON. Do not include markdown." },
-      { role: "user", content: buildContentPrompt(profile, request, brandBrain, researchBrief) }
+      { role: "user", content: buildContentPrompt(profile, request, brandBrain, researchBrief, plannedAngles) }
     ]
   });
 
@@ -459,22 +462,24 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
     throw new Error("OpenAI response did not include a posts array.");
   }
 
-  return parsed.posts.map((post) => {
+  return parsed.posts.map((post, index) => {
+    const contentAngle = String(post.content_angle || plannedAngles[index]?.name || plannedAngles[0]?.name || "Therapist Perspective").trim();
     const whyThisWorks = post.why_this_works || {
       goal_used: request.contentGoal,
       audience_insight: researchBrief.audience_insight,
-      psychological_angle: researchBrief.psychological_angle,
+      psychological_angle: `${contentAngle}: ${researchBrief.psychological_angle}`,
       cta_strategy: researchBrief.cta_strategy,
       suggested_template: researchBrief.suggested_template
     };
 
     return removeEmDashesDeep({
       hook: String(post.hook || "").trim(),
+      content_angle: contentAngle,
       caption: String(post.caption || "").trim(),
       hashtags: Array.isArray(post.hashtags) ? post.hashtags.map(String) : [],
       visual_idea: String(post.visual_idea || "").trim(),
       script: String(post.script || "").trim(),
-      content_intelligence_brief: researchBrief,
+      content_intelligence_brief: { ...researchBrief, content_angle: contentAngle },
       content_intelligence_brief_summary: String(post.content_intelligence_brief_summary || researchBrief.practical_takeaway).trim(),
       why_this_works: {
         goal_used: String(whyThisWorks.goal_used || request.contentGoal),

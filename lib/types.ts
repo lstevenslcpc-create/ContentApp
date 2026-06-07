@@ -120,6 +120,7 @@ export type GeneratedContent = {
   platform?: string | null;
   content_type?: string | null;
   content_goal?: string | null;
+  content_angle?: string | null;
   hook?: string | null;
   caption?: string | null;
   hashtags?: string[];
@@ -142,6 +143,7 @@ export type GeneratedContent = {
 };
 
 export type ContentIntelligenceBrief = {
+  content_angle?: string;
   topic_definition: string;
   psychological_explanation: string;
   common_symptoms: string[];

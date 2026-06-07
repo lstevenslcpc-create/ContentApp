@@ -45,6 +45,7 @@ export async function POST(request: Request) {
       platform: body.platform,
       content_type: body.contentType,
       content_goal: body.contentGoal,
+      content_angle: post.content_angle || null,
       hook: post.hook,
       caption: post.caption,
       hashtags: post.hashtags,
@@ -57,10 +58,11 @@ export async function POST(request: Request) {
     }));
 
     const { data, error } = await supabase.from("generated_content").insert(rows).select("*");
-    if (error && /(topic|content_intelligence_brief|why_this_works)/i.test(error.message || "")) {
+    if (error && /(topic|content_angle|content_intelligence_brief|why_this_works)/i.test(error.message || "")) {
       const fallbackRows = rows.map((row) => {
         const {
           topic: _topic,
+          content_angle: _contentAngle,
           content_intelligence_brief: _contentIntelligenceBrief,
           why_this_works: _whyThisWorks,
           ...fallbackRow
@@ -73,6 +75,7 @@ export async function POST(request: Request) {
         posts: (retry.data || []).map((post, index) => ({
           ...post,
           topic,
+          content_angle: posts[index]?.content_angle || null,
           content_intelligence_brief: posts[index]?.content_intelligence_brief || null,
           why_this_works: posts[index]?.why_this_works || null
         })),
@@ -83,6 +86,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       posts: (data || []).map((post, index) => ({
         ...post,
+        content_angle: post.content_angle || posts[index]?.content_angle || null,
         content_intelligence_brief: post.content_intelligence_brief || posts[index]?.content_intelligence_brief || null,
         why_this_works: post.why_this_works || posts[index]?.why_this_works || null
       }))

@@ -53,6 +53,7 @@ create table if not exists generated_content (
   platform text,
   content_type text,
   content_goal text,
+  content_angle text,
   hook text,
   caption text,
   hashtags text[] default '{}',
@@ -282,6 +283,7 @@ alter table brand_brains add column if not exists content_goals text[] default '
 alter table brand_brains add column if not exists conversion_priorities text[] default '{}';
 alter table generated_content add column if not exists user_id uuid references auth.users(id) on delete cascade;
 alter table generated_content add column if not exists topic text;
+alter table generated_content add column if not exists content_angle text;
 alter table generated_content add column if not exists canva_design_url text;
 alter table generated_content add column if not exists canva_template_id text;
 alter table generated_content add column if not exists archived boolean default false;
