@@ -5,6 +5,7 @@ import { formatBrandBrainForPrompt } from "./brandBrain/format";
 import { buildContentIntelligenceBrief } from "./contentResearch";
 import { selectAnglesForGeneration } from "./contentAngles";
 import { buildFrameworkBrief } from "./psychologyFrameworkEngine";
+import { buildExampleBrief } from "./realLifeExampleEngine";
 
 type GeneratedPost = {
   hook: string;
@@ -17,6 +18,11 @@ type GeneratedPost = {
   whyThisFrameworkFits?: string;
   frameworkExplanation?: string;
   practicalApplication?: string;
+  thoughts?: string[];
+  emotions?: string[];
+  behaviors?: string[];
+  bodySigns?: string[];
+  whatThisCanLookLike?: string[];
   content_intelligence_brief?: ContentIntelligenceBrief;
   content_intelligence_brief_summary?: string;
   why_this_works?: ContentWhyThisWorks;
@@ -439,12 +445,13 @@ function normalizeContentPack(value: unknown, opportunity: ContentOpportunity) {
   return { pack: removeEmDashesDeep(pack), warnings };
 }
 
-function fallbackGeneratedPost(request: ContentGenerationRequest, researchBrief: ContentIntelligenceBrief, contentAngle: string, selectedFramework: string, frameworkExplanation: string, practicalApplication: string): GeneratedPost {
+function fallbackGeneratedPost(request: ContentGenerationRequest, researchBrief: ContentIntelligenceBrief, contentAngle: string, selectedFramework: string, frameworkExplanation: string, practicalApplication: string, exampleBrief = buildExampleBrief(request.topic, contentAngle, request.contentGoal)): GeneratedPost {
   const hook = `${contentAngle}: what ${request.topic} can look like beneath the surface`;
+  const example = exampleBrief.whatThisCanLookLike[0] || exampleBrief.behaviors[0] || exampleBrief.realLifeExamples[0] || "a daily-life pattern that is easy to misread";
   return {
     hook,
     content_angle: contentAngle,
-    caption: `${hook}\n\n${frameworkExplanation}\n\nA therapist would want you to notice the pattern without turning it into shame. ${practicalApplication}\n\n${researchBrief.best_fit_cta}`,
+    caption: `${hook}\n\nThis can look like ${example}.\n\n${frameworkExplanation}\n\nA therapist would want you to notice the pattern without turning it into shame. ${practicalApplication}\n\n${researchBrief.best_fit_cta}`,
     hashtags: ["#LionHeartTherapy", "#MentalHealthEducation", `#${String(request.topic || "therapy").replace(/\s+/g, "")}`],
     visual_idea: `${researchBrief.suggested_template}. Use the ${contentAngle} angle with a calm, therapist-led visual hierarchy.`,
     script: "",
@@ -452,6 +459,11 @@ function fallbackGeneratedPost(request: ContentGenerationRequest, researchBrief:
     whyThisFrameworkFits: `${selectedFramework} gives this ${contentAngle} post a clear teaching structure.`,
     frameworkExplanation,
     practicalApplication,
+    thoughts: exampleBrief.thoughts,
+    emotions: exampleBrief.emotions,
+    behaviors: exampleBrief.behaviors,
+    bodySigns: exampleBrief.bodySigns,
+    whatThisCanLookLike: exampleBrief.whatThisCanLookLike,
     content_intelligence_brief_summary: researchBrief.practical_takeaway
   };
 }
@@ -464,6 +476,7 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
   const researchBrief = await buildContentIntelligenceBrief({ request, brandBrain });
   const plannedAngles = selectAnglesForGeneration(request.topic, request.contentGoal, request.numberOfPosts || 1);
   const frameworkBriefs = plannedAngles.map((angle) => buildFrameworkBrief(request.topic, angle.name, request.contentGoal));
+  const exampleBriefs = plannedAngles.map((angle) => buildExampleBrief(request.topic, angle.name, request.contentGoal));
   const client = await createOpenAiClient(process.env.OPENAI_API_KEY);
   const completion = await client.chat.completions.create({
     model: "gpt-4o-mini",
@@ -471,7 +484,7 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
     response_format: { type: "json_object" },
     messages: [
       { role: "system", content: "Return only valid JSON. Do not include markdown." },
-      { role: "user", content: buildContentPrompt(profile, request, brandBrain, researchBrief, plannedAngles, frameworkBriefs) }
+      { role: "user", content: buildContentPrompt(profile, request, brandBrain, researchBrief, plannedAngles, frameworkBriefs, exampleBriefs) }
     ]
   });
 
@@ -491,7 +504,8 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
     angle.name,
     frameworkBriefs[index]?.selectedFramework || "CBT Thought-Feeling-Behavior Cycle",
     frameworkBriefs[index]?.frameworkExplanation || researchBrief.psychological_explanation,
-    frameworkBriefs[index]?.practicalApplication || researchBrief.practical_takeaway
+    frameworkBriefs[index]?.practicalApplication || researchBrief.practical_takeaway,
+    exampleBriefs[index]
   ));
 
   return postInputs.map((post, index) => {
@@ -501,6 +515,12 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
     const frameworkExplanation = String(post.frameworkExplanation || frameworkBrief.frameworkExplanation);
     const practicalApplication = String(post.practicalApplication || frameworkBrief.practicalApplication);
     const whyThisFrameworkFits = String(post.whyThisFrameworkFits || frameworkBrief.whyThisFrameworkFits);
+    const exampleBrief = exampleBriefs[index] || buildExampleBrief(request.topic, contentAngle, request.contentGoal);
+    const thoughts = asStringArray(post.thoughts).length ? asStringArray(post.thoughts) : exampleBrief.thoughts;
+    const emotions = asStringArray(post.emotions).length ? asStringArray(post.emotions) : exampleBrief.emotions;
+    const behaviors = asStringArray(post.behaviors).length ? asStringArray(post.behaviors) : exampleBrief.behaviors;
+    const bodySigns = asStringArray(post.bodySigns).length ? asStringArray(post.bodySigns) : exampleBrief.bodySigns;
+    const whatThisCanLookLike = asStringArray(post.whatThisCanLookLike).length ? asStringArray(post.whatThisCanLookLike) : exampleBrief.whatThisCanLookLike;
     const whyThisWorks = post.why_this_works || {
       goal_used: request.contentGoal,
       audience_insight: researchBrief.audience_insight,
@@ -523,13 +543,24 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
       whyThisFrameworkFits,
       frameworkExplanation,
       practicalApplication,
+      thoughts,
+      emotions,
+      behaviors,
+      bodySigns,
+      whatThisCanLookLike,
       content_intelligence_brief: {
         ...researchBrief,
         content_angle: contentAngle,
         selectedFramework,
         whyThisFrameworkFits,
         frameworkExplanation,
-        practicalApplication
+        practicalApplication,
+        thoughts,
+        emotions,
+        behaviors,
+        bodySigns,
+        whatThisCanLookLike,
+        real_life_examples: Array.from(new Set([...researchBrief.real_life_examples, ...exampleBrief.realLifeExamples, ...whatThisCanLookLike]))
       },
       content_intelligence_brief_summary: String(post.content_intelligence_brief_summary || researchBrief.practical_takeaway).trim(),
       why_this_works: {

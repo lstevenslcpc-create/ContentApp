@@ -1,5 +1,6 @@
 import type { ContentAngle } from "./contentAngles";
 import type { FrameworkBrief } from "./psychologyFrameworkEngine";
+import type { ExampleBrief } from "./realLifeExampleEngine";
 import type { BrandBrain, BusinessProfile, ContentGenerationRequest, ContentIntelligenceBrief } from "./types";
 import { formatBrandBrainForPrompt } from "./brandBrain/format";
 import { formatContentGoalForPrompt } from "./contentGoalConfig";
@@ -38,6 +39,11 @@ Content Research + Depth Brief:
 - Why this framework fits: ${brief.whyThisFrameworkFits || "Framework selected per post."}
 - Framework explanation: ${brief.frameworkExplanation || "Teach through the selected framework."}
 - Practical application: ${brief.practicalApplication || "Give one grounded next step through the selected framework."}
+- Thoughts: ${(brief.thoughts || []).join(" | ") || "Use the assigned example brief."}
+- Emotions: ${(brief.emotions || []).join(" | ") || "Use the assigned example brief."}
+- Behaviors: ${(brief.behaviors || []).join(" | ") || "Use the assigned example brief."}
+- Body signs: ${(brief.bodySigns || []).join(" | ") || "Use the assigned example brief."}
+- What this can look like: ${(brief.whatThisCanLookLike || []).join(" | ") || "Use the assigned example brief."}
 - Topic definition: ${brief.topic_definition}
 - Psychological explanation: ${brief.psychological_explanation}
 - Common symptoms: ${brief.common_symptoms.join(", ")}
@@ -86,7 +92,23 @@ Every post must teach through its assigned framework. Do not only name symptoms 
 `;
 }
 
-export function buildContentPrompt(profile: BusinessProfile, request: ContentGenerationRequest, brandBrain?: BrandBrain | null, researchBrief?: ContentIntelligenceBrief | null, plannedAngles: ContentAngle[] = [], frameworkBriefs: FrameworkBrief[] = []) {
+function formatExampleBriefsForPrompt(exampleBriefs: ExampleBrief[] = []) {
+  if (!exampleBriefs.length) return "";
+  return `
+Required Real-Life Example Briefs:
+${exampleBriefs.map((brief, index) => `Post ${index + 1}:
+- Thoughts: ${brief.thoughts.join(" | ") || "none"}
+- Emotions: ${brief.emotions.join(" | ") || "none"}
+- Behaviors: ${brief.behaviors.join(" | ") || "none"}
+- Body signs: ${brief.bodySigns.join(" | ") || "none"}
+- Real-life examples: ${brief.realLifeExamples.join(" | ") || "none"}
+- What this can look like: ${brief.whatThisCanLookLike.join(" | ") || "none"}`).join("\n")}
+
+Every post must include at least one specific real-life example from its assigned example brief unless the content type truly cannot support examples.
+`;
+}
+
+export function buildContentPrompt(profile: BusinessProfile, request: ContentGenerationRequest, brandBrain?: BrandBrain | null, researchBrief?: ContentIntelligenceBrief | null, plannedAngles: ContentAngle[] = [], frameworkBriefs: FrameworkBrief[] = [], exampleBriefs: ExampleBrief[] = []) {
   return `
 You are an expert small-business content strategist. Generate ${request.numberOfPosts} ready-to-review ${request.contentType} idea(s) for ${request.platform}.
 
@@ -108,6 +130,7 @@ ${followerGrowthInstructions(request)}
 ${formatResearchBriefForPrompt(researchBrief)}
 ${formatPlannedAnglesForPrompt(plannedAngles)}
 ${formatFrameworkBriefsForPrompt(frameworkBriefs)}
+${formatExampleBriefsForPrompt(exampleBriefs)}
 
 ${request.intelligenceBrief ? `
 Saved Content Opportunity Brief:
@@ -160,6 +183,8 @@ Content rules:
 - Every post must explain the psychology behind the angle using the assigned framework. Use the framework to teach why the pattern happens, how it shows up, and what a grounded next step can look like.
 - When the assigned framework combines two frameworks, explain how both fit without becoming academic.
 - Do not use framework names as decoration only. The caption must actually teach through the framework.
+- Every post must include at least one concrete real-life example, behavior, body sign, thought, phrase, or daily-life moment from the assigned example brief unless the selected content type truly cannot support examples.
+- Prefer examples like irritability after school, stomach aches before class, avoiding homework, saying "I am fine", shutting down when asked questions, perfectionism around grades, rereading texts, checking tone changes, or overexplaining after conflict.
 
 Return strict JSON only with this shape:
 {
@@ -175,6 +200,11 @@ Return strict JSON only with this shape:
       "whyThisFrameworkFits": "Why this framework fits the topic, angle, and goal",
       "frameworkExplanation": "Short explanation of the psychology behind the post",
       "practicalApplication": "One grounded way the audience can apply the framework",
+      "thoughts": ["Specific thought patterns used in this post"],
+      "emotions": ["Specific emotions used in this post"],
+      "behaviors": ["Specific behaviors used in this post"],
+      "bodySigns": ["Specific body signs used in this post"],
+      "whatThisCanLookLike": ["Concrete daily-life examples used in this post"],
       "content_intelligence_brief_summary": "Short review summary of the topic depth used in this post",
       "why_this_works": {
         "goal_used": "${request.contentGoal}",

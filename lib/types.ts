@@ -148,6 +148,11 @@ export type ContentIntelligenceBrief = {
   whyThisFrameworkFits?: string;
   frameworkExplanation?: string;
   practicalApplication?: string;
+  thoughts?: string[];
+  emotions?: string[];
+  behaviors?: string[];
+  bodySigns?: string[];
+  whatThisCanLookLike?: string[];
   topic_definition: string;
   psychological_explanation: string;
   common_symptoms: string[];
