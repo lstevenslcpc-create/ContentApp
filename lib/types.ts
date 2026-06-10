@@ -153,6 +153,14 @@ export type ContentIntelligenceBrief = {
   behaviors?: string[];
   bodySigns?: string[];
   whatThisCanLookLike?: string[];
+  therapistInsight?: string;
+  commonMisunderstanding?: string;
+  whatPeopleOftenMiss?: string;
+  whatToKnow?: string;
+  whatNotToSay?: string[];
+  whatToTryInstead?: string[];
+  clinicalNuance?: string;
+  LionHeartStyleNote?: string;
   topic_definition: string;
   psychological_explanation: string;
   common_symptoms: string[];
@@ -182,6 +190,19 @@ export type ContentWhyThisWorks = {
   selected_framework?: string;
   framework_explanation?: string;
   practical_application?: string;
+  therapist_insight?: string;
+  real_life_example_used?: string;
+  quality_checklist?: ContentQualityChecklist;
+};
+
+export type ContentQualityChecklist = {
+  hookSpecific: boolean;
+  teachesSomething: boolean;
+  includesRealLifeExample: boolean;
+  matchesSelectedGoal: boolean;
+  ctaAppropriate: boolean;
+  avoidsGenericAiPhrases: boolean;
+  soundsLikeLionHeartTherapy: boolean;
 };
 
 export type PlatformAngles = {

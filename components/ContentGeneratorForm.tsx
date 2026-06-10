@@ -54,7 +54,7 @@ export function ContentGeneratorForm() {
           <label><span className="label">Content type</span><select className="field mt-1" name="contentType">{["post","reel","short video","carousel","story","ad"].map((x) => <option key={x}>{x}</option>)}</select></label>
           <label><span className="label">Topic</span><input className="field mt-1" name="topic" required placeholder="anxious attachment, people pleasing, teen anxiety..." /></label>
           <label><span className="label">Content goal</span><select className="field mt-1" name="contentGoal">{CONTENT_GOAL_IDS.map((x) => <option key={x}>{x}</option>)}</select></label>
-          <label><span className="label">Number of posts</span><select className="field mt-1" name="numberOfPosts">{[1,7,30].map((x) => <option key={x}>{x}</option>)}</select></label>
+          <label><span className="label">Number of posts</span><select className="field mt-1" name="numberOfPosts">{[1,5,7,30].map((x) => <option key={x}>{x}</option>)}</select></label>
           <button className="btn-primary" disabled={loading}>{loading ? "Generating..." : "Generate Content"}</button>
           {error && <p className="rounded-lg bg-rose-50 p-3 text-sm font-semibold text-rose-700">{error}</p>}
           <p className="text-xs leading-5 text-slate-500">Canva workflow: generated visual ideas are written as Canva-ready creative directions. API-level Canva automation can be added in a future phase with official integration and templates.</p>

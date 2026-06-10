@@ -1,6 +1,7 @@
 import type { ContentAngle } from "./contentAngles";
 import type { FrameworkBrief } from "./psychologyFrameworkEngine";
 import type { ExampleBrief } from "./realLifeExampleEngine";
+import type { TherapistInsightBrief } from "./therapistInsightEngine";
 import type { BrandBrain, BusinessProfile, ContentGenerationRequest, ContentIntelligenceBrief } from "./types";
 import { formatBrandBrainForPrompt } from "./brandBrain/format";
 import { formatContentGoalForPrompt } from "./contentGoalConfig";
@@ -44,6 +45,14 @@ Content Research + Depth Brief:
 - Behaviors: ${(brief.behaviors || []).join(" | ") || "Use the assigned example brief."}
 - Body signs: ${(brief.bodySigns || []).join(" | ") || "Use the assigned example brief."}
 - What this can look like: ${(brief.whatThisCanLookLike || []).join(" | ") || "Use the assigned example brief."}
+- Therapist insight: ${brief.therapistInsight || "Use the assigned therapist insight brief."}
+- Common misunderstanding: ${brief.commonMisunderstanding || "Use the assigned therapist insight brief."}
+- What people often miss: ${brief.whatPeopleOftenMiss || "Use the assigned therapist insight brief."}
+- What parents, partners, or clients need to know: ${brief.whatToKnow || "Use the assigned therapist insight brief."}
+- What not to say: ${(brief.whatNotToSay || []).join(" | ") || "Use the assigned therapist insight brief."}
+- What to try instead: ${(brief.whatToTryInstead || []).join(" | ") || "Use the assigned therapist insight brief."}
+- Clinical nuance: ${brief.clinicalNuance || "Use the assigned therapist insight brief."}
+- LionHeart style note: ${brief.LionHeartStyleNote || "Therapist-led, emotionally specific, practical, warm, and non-generic."}
 - Topic definition: ${brief.topic_definition}
 - Psychological explanation: ${brief.psychological_explanation}
 - Common symptoms: ${brief.common_symptoms.join(", ")}
@@ -108,7 +117,25 @@ Every post must include at least one specific real-life example from its assigne
 `;
 }
 
-export function buildContentPrompt(profile: BusinessProfile, request: ContentGenerationRequest, brandBrain?: BrandBrain | null, researchBrief?: ContentIntelligenceBrief | null, plannedAngles: ContentAngle[] = [], frameworkBriefs: FrameworkBrief[] = [], exampleBriefs: ExampleBrief[] = []) {
+function formatTherapistInsightBriefsForPrompt(insightBriefs: TherapistInsightBrief[] = []) {
+  if (!insightBriefs.length) return "";
+  return `
+Required Therapist Insight Briefs:
+${insightBriefs.map((brief, index) => `Post ${index + 1}:
+- Therapist observation: ${brief.therapistInsight}
+- Common misunderstanding: ${brief.commonMisunderstanding}
+- What people often miss: ${brief.whatPeopleOftenMiss}
+- What parents, partners, or clients need to know: ${brief.whatToKnow}
+- What not to say: ${brief.whatNotToSay.join(" | ")}
+- What to try instead: ${brief.whatToTryInstead.join(" | ")}
+- Clinical nuance: ${brief.clinicalNuance}
+- LionHeart style note: ${brief.LionHeartStyleNote}`).join("\n")}
+
+Every post must sound therapist-led, emotionally specific, practical, warm, and non-generic. Use the assigned therapist observation to shape the caption.
+`;
+}
+
+export function buildContentPrompt(profile: BusinessProfile, request: ContentGenerationRequest, brandBrain?: BrandBrain | null, researchBrief?: ContentIntelligenceBrief | null, plannedAngles: ContentAngle[] = [], frameworkBriefs: FrameworkBrief[] = [], exampleBriefs: ExampleBrief[] = [], therapistInsightBriefs: TherapistInsightBrief[] = []) {
   return `
 You are an expert small-business content strategist. Generate ${request.numberOfPosts} ready-to-review ${request.contentType} idea(s) for ${request.platform}.
 
@@ -131,6 +158,7 @@ ${formatResearchBriefForPrompt(researchBrief)}
 ${formatPlannedAnglesForPrompt(plannedAngles)}
 ${formatFrameworkBriefsForPrompt(frameworkBriefs)}
 ${formatExampleBriefsForPrompt(exampleBriefs)}
+${formatTherapistInsightBriefsForPrompt(therapistInsightBriefs)}
 
 ${request.intelligenceBrief ? `
 Saved Content Opportunity Brief:
@@ -185,6 +213,10 @@ Content rules:
 - Do not use framework names as decoration only. The caption must actually teach through the framework.
 - Every post must include at least one concrete real-life example, behavior, body sign, thought, phrase, or daily-life moment from the assigned example brief unless the selected content type truly cannot support examples.
 - Prefer examples like irritability after school, stomach aches before class, avoiding homework, saying "I am fine", shutting down when asked questions, perfectionism around grades, rereading texts, checking tone changes, or overexplaining after conflict.
+- Use the assigned therapist insight to avoid broad or promotional language. The post should sound like a licensed therapist naming what is happening underneath, not like AI summarizing symptoms.
+- Do not use the assigned "what not to say" language except to explain that it is unhelpful. Prefer "what to try instead" scripts when a practical phrase fits.
+- Avoid promotional language unless the goal is leads, therapy-inquiries, product-sales, promotion, or email-list-growth.
+- Avoid generic AI phrases including "unlock your potential", "healing journey", "just breathe", "you are enough", "mental health matters", "discover practical tools", and "nurture secure relationships".
 
 Return strict JSON only with this shape:
 {
@@ -205,6 +237,13 @@ Return strict JSON only with this shape:
       "behaviors": ["Specific behaviors used in this post"],
       "bodySigns": ["Specific body signs used in this post"],
       "whatThisCanLookLike": ["Concrete daily-life examples used in this post"],
+      "therapistInsight": "Therapist observation used in this post",
+      "commonMisunderstanding": "Misunderstanding this post corrects",
+      "whatPeopleOftenMiss": "Subtle point people often miss",
+      "whatToKnow": "What parents, partners, or clients need to know",
+      "whatToTryInstead": ["Practical phrase or action to try instead"],
+      "clinicalNuance": "Clinical nuance that keeps the post ethical and non-generic",
+      "LionHeartStyleNote": "How this follows LionHeart's voice",
       "content_intelligence_brief_summary": "Short review summary of the topic depth used in this post",
       "why_this_works": {
         "goal_used": "${request.contentGoal}",
@@ -214,7 +253,18 @@ Return strict JSON only with this shape:
         "suggested_template": "Best Canva/template direction",
         "selected_framework": "The selected framework",
         "framework_explanation": "How the framework teaches the post",
-        "practical_application": "The practical application included"
+        "practical_application": "The practical application included",
+        "therapist_insight": "The therapist insight used",
+        "real_life_example_used": "The specific real-life example used",
+        "quality_checklist": {
+          "hookSpecific": true,
+          "teachesSomething": true,
+          "includesRealLifeExample": true,
+          "matchesSelectedGoal": true,
+          "ctaAppropriate": true,
+          "avoidsGenericAiPhrases": true,
+          "soundsLikeLionHeartTherapy": true
+        }
       }
     }
   ]

@@ -11,7 +11,7 @@ export async function POST(request: Request) {
     const numberOfPosts = Number(body.numberOfPosts || 1);
     const topic = String(body.topic || "").trim();
 
-    if (!topic || !body.platform || !body.contentType || !body.contentGoal || ![1, 7, 30].includes(numberOfPosts)) {
+    if (!topic || !body.platform || !body.contentType || !body.contentGoal || ![1, 5, 7, 30].includes(numberOfPosts)) {
       return NextResponse.json({ error: "topic, platform, contentType, contentGoal, and numberOfPosts are required." }, { status: 400 });
     }
 

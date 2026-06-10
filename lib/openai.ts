@@ -1,11 +1,12 @@
 import type OpenAI from "openai";
-import type { BrandBrain, BusinessProfile, ContentGenerationRequest, ContentIntelligenceBrief, ContentOpportunity, ContentPackBody, ContentWhyThisWorks } from "./types";
+import type { BrandBrain, BusinessProfile, ContentGenerationRequest, ContentIntelligenceBrief, ContentOpportunity, ContentPackBody, ContentQualityChecklist, ContentWhyThisWorks } from "./types";
 import { buildContentPrompt } from "./contentPrompt";
 import { formatBrandBrainForPrompt } from "./brandBrain/format";
 import { buildContentIntelligenceBrief } from "./contentResearch";
 import { selectAnglesForGeneration } from "./contentAngles";
 import { buildFrameworkBrief } from "./psychologyFrameworkEngine";
 import { buildExampleBrief } from "./realLifeExampleEngine";
+import { buildTherapistInsightBrief } from "./therapistInsightEngine";
 
 type GeneratedPost = {
   hook: string;
@@ -23,6 +24,14 @@ type GeneratedPost = {
   behaviors?: string[];
   bodySigns?: string[];
   whatThisCanLookLike?: string[];
+  therapistInsight?: string;
+  commonMisunderstanding?: string;
+  whatPeopleOftenMiss?: string;
+  whatToKnow?: string;
+  whatNotToSay?: string[];
+  whatToTryInstead?: string[];
+  clinicalNuance?: string;
+  LionHeartStyleNote?: string;
   content_intelligence_brief?: ContentIntelligenceBrief;
   content_intelligence_brief_summary?: string;
   why_this_works?: ContentWhyThisWorks;
@@ -445,15 +454,59 @@ function normalizeContentPack(value: unknown, opportunity: ContentOpportunity) {
   return { pack: removeEmDashesDeep(pack), warnings };
 }
 
-function fallbackGeneratedPost(request: ContentGenerationRequest, researchBrief: ContentIntelligenceBrief, contentAngle: string, selectedFramework: string, frameworkExplanation: string, practicalApplication: string, exampleBrief = buildExampleBrief(request.topic, contentAngle, request.contentGoal)): GeneratedPost {
-  const hook = `${contentAngle}: what ${request.topic} can look like beneath the surface`;
+function sentenceCase(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  return `${trimmed.charAt(0).toUpperCase()}${trimmed.slice(1)}`;
+}
+
+function fallbackHook(request: ContentGenerationRequest, contentAngle: string, example: string, therapistInsightBrief: ReturnType<typeof buildTherapistInsightBrief>) {
+  const topic = request.topic.toLowerCase();
+  if (topic.includes("teen anxiety")) {
+    return example
+      ? `When ${example.replace(/^a teen\s+/i, "your teen ")} is anxiety, not attitude`
+      : "When your teen says I am fine but their body is telling another story";
+  }
+  if (topic.includes("anxious attachment")) {
+    return "When a small shift in tone makes your whole body search for what went wrong";
+  }
+  if (topic.includes("people pleasing")) {
+    return "The yes that looks kind on the outside can feel like panic underneath";
+  }
+  if (example) {
+    return `${sentenceCase(example)} may be the clue, not the whole story`;
+  }
+  return therapistInsightBrief.therapistInsight;
+}
+
+function fallbackCta(request: ContentGenerationRequest, researchBrief: ContentIntelligenceBrief) {
+  switch (request.contentGoal) {
+    case "follower-growth":
+      return "Save this if it felt familiar. Send it to someone who overthinks every tone shift. Follow @LHtherapy for emotionally honest mental health content.";
+    case "saves":
+      return "Save this for the moment you need language before you can explain the feeling.";
+    case "shares":
+      return "Send this to someone who has been trying to put this pattern into words.";
+    case "therapy-inquiries":
+    case "leads":
+      return "If this is affecting daily life or relationships, therapy can help you understand the pattern and build steadier support.";
+    case "product-sales":
+      return researchBrief.best_fit_cta || "Use the workbook as a gentle place to turn this pattern into language and next steps.";
+    default:
+      return researchBrief.best_fit_cta || "Save this for later, and review it before posting.";
+  }
+}
+
+function fallbackGeneratedPost(request: ContentGenerationRequest, researchBrief: ContentIntelligenceBrief, contentAngle: string, selectedFramework: string, frameworkExplanation: string, practicalApplication: string, exampleBrief = buildExampleBrief(request.topic, contentAngle, request.contentGoal), therapistInsightBrief = buildTherapistInsightBrief(request.topic, contentAngle, request.contentGoal)): GeneratedPost {
   const example = exampleBrief.whatThisCanLookLike[0] || exampleBrief.behaviors[0] || exampleBrief.realLifeExamples[0] || "a daily-life pattern that is easy to misread";
+  const hook = fallbackHook(request, contentAngle, example, therapistInsightBrief);
+  const cta = fallbackCta(request, researchBrief);
   return {
     hook,
     content_angle: contentAngle,
-    caption: `${hook}\n\nThis can look like ${example}.\n\n${frameworkExplanation}\n\nA therapist would want you to notice the pattern without turning it into shame. ${practicalApplication}\n\n${researchBrief.best_fit_cta}`,
+    caption: `${hook}\n\nThis can look like ${example}.\n\n${therapistInsightBrief.therapistInsight}\n\n${frameworkExplanation}\n\nWhat this means: ${therapistInsightBrief.commonMisunderstanding} is not the whole story. ${therapistInsightBrief.whatPeopleOftenMiss} often matters more than people realize.\n\nTry this instead: ${therapistInsightBrief.whatToTryInstead[0] || practicalApplication}\n\n${cta}`,
     hashtags: ["#LionHeartTherapy", "#MentalHealthEducation", `#${String(request.topic || "therapy").replace(/\s+/g, "")}`],
-    visual_idea: `${researchBrief.suggested_template}. Use the ${contentAngle} angle with a calm, therapist-led visual hierarchy.`,
+    visual_idea: `${researchBrief.suggested_template}. Use the ${contentAngle} angle with a calm, therapist-led visual hierarchy. Feature this specific moment: ${example}.`,
     script: "",
     selectedFramework,
     whyThisFrameworkFits: `${selectedFramework} gives this ${contentAngle} post a clear teaching structure.`,
@@ -464,8 +517,59 @@ function fallbackGeneratedPost(request: ContentGenerationRequest, researchBrief:
     behaviors: exampleBrief.behaviors,
     bodySigns: exampleBrief.bodySigns,
     whatThisCanLookLike: exampleBrief.whatThisCanLookLike,
+    therapistInsight: therapistInsightBrief.therapistInsight,
+    commonMisunderstanding: therapistInsightBrief.commonMisunderstanding,
+    whatPeopleOftenMiss: therapistInsightBrief.whatPeopleOftenMiss,
+    whatToKnow: therapistInsightBrief.whatToKnow,
+    whatNotToSay: therapistInsightBrief.whatNotToSay,
+    whatToTryInstead: therapistInsightBrief.whatToTryInstead,
+    clinicalNuance: therapistInsightBrief.clinicalNuance,
+    LionHeartStyleNote: therapistInsightBrief.LionHeartStyleNote,
     content_intelligence_brief_summary: researchBrief.practical_takeaway
   };
+}
+
+function includesAny(value: string, terms: string[]) {
+  const normalized = value.toLowerCase();
+  return terms.some((term) => normalized.includes(term.toLowerCase()));
+}
+
+function qualityChecklist(post: GeneratedPost, request: ContentGenerationRequest): ContentQualityChecklist {
+  const hook = String(post.hook || "");
+  const caption = String(post.caption || "");
+  const allText = `${hook}\n${caption}`;
+  const examples = [
+    ...asStringArray(post.behaviors),
+    ...asStringArray(post.bodySigns),
+    ...asStringArray(post.whatThisCanLookLike)
+  ];
+  const genericPhrases = [
+    "unlock your potential",
+    "healing journey",
+    "just breathe",
+    "you are enough",
+    "mental health matters",
+    "discover practical tools",
+    "nurture secure relationships",
+    "many people struggle",
+    "does this sound familiar"
+  ];
+  const promotionalPhrases = ["book now", "schedule today", "buy now", "limited time", "guaranteed"];
+  const promoAllowed = ["leads", "therapy-inquiries", "product-sales", "promotion", "email-list-growth"].includes(request.contentGoal);
+
+  return {
+    hookSpecific: hook.length >= 18 && !/^are you|^do you struggle|^does this sound familiar/i.test(hook),
+    teachesSomething: Boolean(post.selectedFramework || post.frameworkExplanation) && caption.length > 120,
+    includesRealLifeExample: examples.some((example) => includesAny(allText, [example])) || includesAny(allText, examples.slice(0, 5)),
+    matchesSelectedGoal: promoAllowed || !includesAny(allText, promotionalPhrases),
+    ctaAppropriate: Boolean(caption.match(/save|share|follow|reach out|learn|try|notice|ask|download|shop/i)),
+    avoidsGenericAiPhrases: !includesAny(allText, genericPhrases),
+    soundsLikeLionHeartTherapy: Boolean(post.therapistInsight || post.LionHeartStyleNote) && includesAny(allText, ["therapist", "notice", "underneath", "body", "pattern", "pressure", "support", "try"])
+  };
+}
+
+function checklistPassed(checklist: ContentQualityChecklist) {
+  return Object.values(checklist).every(Boolean);
 }
 
 export async function generateStructuredContent(profile: BusinessProfile, request: ContentGenerationRequest, brandBrain?: BrandBrain | null): Promise<GeneratedPost[]> {
@@ -477,40 +581,53 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
   const plannedAngles = selectAnglesForGeneration(request.topic, request.contentGoal, request.numberOfPosts || 1);
   const frameworkBriefs = plannedAngles.map((angle) => buildFrameworkBrief(request.topic, angle.name, request.contentGoal));
   const exampleBriefs = plannedAngles.map((angle) => buildExampleBrief(request.topic, angle.name, request.contentGoal));
+  const therapistInsightBriefs = plannedAngles.map((angle) => buildTherapistInsightBrief(request.topic, angle.name, request.contentGoal));
+  const prompt = buildContentPrompt(profile, request, brandBrain, researchBrief, plannedAngles, frameworkBriefs, exampleBriefs, therapistInsightBriefs);
   const client = await createOpenAiClient(process.env.OPENAI_API_KEY);
-  const completion = await client.chat.completions.create({
-    model: "gpt-4o-mini",
-    temperature: 0.75,
-    response_format: { type: "json_object" },
-    messages: [
-      { role: "system", content: "Return only valid JSON. Do not include markdown." },
-      { role: "user", content: buildContentPrompt(profile, request, brandBrain, researchBrief, plannedAngles, frameworkBriefs, exampleBriefs) }
-    ]
-  });
 
-  const raw = completion.choices[0]?.message?.content;
-  if (!raw) {
-    throw new Error("OpenAI returned an empty response.");
+  async function runGeneration(userPrompt: string) {
+    const completion = await withTimeout(
+      client.chat.completions.create({
+        model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+        temperature: 0.75,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: "Return only valid JSON. Do not include markdown." },
+          { role: "user", content: userPrompt }
+        ]
+      }),
+      45000,
+      "OpenAI content generation"
+    );
+
+    const raw = completion.choices[0]?.message?.content;
+    if (!raw) {
+      throw new Error("OpenAI returned an empty response.");
+    }
+
+    const parsed = extractJsonObject(raw) as { posts?: GeneratedPost[] };
+    if (!Array.isArray(parsed.posts)) {
+      throw new Error("OpenAI response did not include a posts array.");
+    }
+    return parsed.posts;
   }
 
-  const parsed = extractJsonObject(raw) as { posts?: GeneratedPost[] };
-  if (!Array.isArray(parsed.posts)) {
-    throw new Error("OpenAI response did not include a posts array.");
-  }
+  function normalizePosts(posts: GeneratedPost[]) {
+    const postInputs = plannedAngles.map((angle, index) => posts?.[index] || fallbackGeneratedPost(
+      request,
+      researchBrief,
+      angle.name,
+      frameworkBriefs[index]?.selectedFramework || "CBT Thought-Feeling-Behavior Cycle",
+      frameworkBriefs[index]?.frameworkExplanation || researchBrief.psychological_explanation,
+      frameworkBriefs[index]?.practicalApplication || researchBrief.practical_takeaway,
+      exampleBriefs[index],
+      therapistInsightBriefs[index]
+    ));
 
-  const postInputs = plannedAngles.map((angle, index) => parsed.posts?.[index] || fallbackGeneratedPost(
-    request,
-    researchBrief,
-    angle.name,
-    frameworkBriefs[index]?.selectedFramework || "CBT Thought-Feeling-Behavior Cycle",
-    frameworkBriefs[index]?.frameworkExplanation || researchBrief.psychological_explanation,
-    frameworkBriefs[index]?.practicalApplication || researchBrief.practical_takeaway,
-    exampleBriefs[index]
-  ));
-
-  return postInputs.map((post, index) => {
+    return postInputs.map((post, index) => {
     const contentAngle = String(post.content_angle || plannedAngles[index]?.name || plannedAngles[0]?.name || "Therapist Perspective").trim();
     const frameworkBrief = frameworkBriefs[index] || buildFrameworkBrief(request.topic, contentAngle, request.contentGoal);
+    const therapistInsightBrief = therapistInsightBriefs[index] || buildTherapistInsightBrief(request.topic, contentAngle, request.contentGoal);
     const selectedFramework = String(post.selectedFramework || frameworkBrief.selectedFramework);
     const frameworkExplanation = String(post.frameworkExplanation || frameworkBrief.frameworkExplanation);
     const practicalApplication = String(post.practicalApplication || frameworkBrief.practicalApplication);
@@ -521,6 +638,14 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
     const behaviors = asStringArray(post.behaviors).length ? asStringArray(post.behaviors) : exampleBrief.behaviors;
     const bodySigns = asStringArray(post.bodySigns).length ? asStringArray(post.bodySigns) : exampleBrief.bodySigns;
     const whatThisCanLookLike = asStringArray(post.whatThisCanLookLike).length ? asStringArray(post.whatThisCanLookLike) : exampleBrief.whatThisCanLookLike;
+    const therapistInsight = String(post.therapistInsight || therapistInsightBrief.therapistInsight);
+    const commonMisunderstanding = String(post.commonMisunderstanding || therapistInsightBrief.commonMisunderstanding);
+    const whatPeopleOftenMiss = String(post.whatPeopleOftenMiss || therapistInsightBrief.whatPeopleOftenMiss);
+    const whatToKnow = String(post.whatToKnow || therapistInsightBrief.whatToKnow);
+    const whatNotToSay = asStringArray(post.whatNotToSay).length ? asStringArray(post.whatNotToSay) : therapistInsightBrief.whatNotToSay;
+    const whatToTryInstead = asStringArray(post.whatToTryInstead).length ? asStringArray(post.whatToTryInstead) : therapistInsightBrief.whatToTryInstead;
+    const clinicalNuance = String(post.clinicalNuance || therapistInsightBrief.clinicalNuance);
+    const LionHeartStyleNote = String(post.LionHeartStyleNote || therapistInsightBrief.LionHeartStyleNote);
     const whyThisWorks = post.why_this_works || {
       goal_used: request.contentGoal,
       audience_insight: researchBrief.audience_insight,
@@ -529,10 +654,13 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
       suggested_template: researchBrief.suggested_template,
       selected_framework: selectedFramework,
       framework_explanation: frameworkExplanation,
-      practical_application: practicalApplication
+      practical_application: practicalApplication,
+      therapist_insight: therapistInsight,
+      real_life_example_used: whatThisCanLookLike[0] || behaviors[0] || "",
+      quality_checklist: qualityChecklist({ ...post, therapistInsight, LionHeartStyleNote, behaviors, bodySigns, whatThisCanLookLike }, request)
     };
 
-    return removeEmDashesDeep({
+    const normalizedPost = removeEmDashesDeep({
       hook: String(post.hook || "").trim(),
       content_angle: contentAngle,
       caption: String(post.caption || "").trim(),
@@ -548,6 +676,14 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
       behaviors,
       bodySigns,
       whatThisCanLookLike,
+      therapistInsight,
+      commonMisunderstanding,
+      whatPeopleOftenMiss,
+      whatToKnow,
+      whatNotToSay,
+      whatToTryInstead,
+      clinicalNuance,
+      LionHeartStyleNote,
       content_intelligence_brief: {
         ...researchBrief,
         content_angle: contentAngle,
@@ -560,6 +696,14 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
         behaviors,
         bodySigns,
         whatThisCanLookLike,
+        therapistInsight,
+        commonMisunderstanding,
+        whatPeopleOftenMiss,
+        whatToKnow,
+        whatNotToSay,
+        whatToTryInstead,
+        clinicalNuance,
+        LionHeartStyleNote,
         real_life_examples: Array.from(new Set([...researchBrief.real_life_examples, ...exampleBrief.realLifeExamples, ...whatThisCanLookLike]))
       },
       content_intelligence_brief_summary: String(post.content_intelligence_brief_summary || researchBrief.practical_takeaway).trim(),
@@ -571,10 +715,87 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
         suggested_template: String(whyThisWorks.suggested_template || researchBrief.suggested_template),
         selected_framework: String(whyThisWorks.selected_framework || selectedFramework),
         framework_explanation: String(whyThisWorks.framework_explanation || frameworkExplanation),
-        practical_application: String(whyThisWorks.practical_application || practicalApplication)
+        practical_application: String(whyThisWorks.practical_application || practicalApplication),
+        therapist_insight: String(whyThisWorks.therapist_insight || therapistInsight),
+        real_life_example_used: String(whyThisWorks.real_life_example_used || whatThisCanLookLike[0] || behaviors[0] || ""),
+        quality_checklist: whyThisWorks.quality_checklist || qualityChecklist({ ...post, therapistInsight, LionHeartStyleNote, behaviors, bodySigns, whatThisCanLookLike }, request)
       }
     });
+    let repairedPost = normalizedPost;
+    let checklist = qualityChecklist(repairedPost, request);
+    const concreteExample = String(repairedPost.why_this_works.real_life_example_used || whatThisCanLookLike[0] || behaviors[0] || "").trim();
+    if (!checklist.includesRealLifeExample && concreteExample) {
+      repairedPost = {
+        ...repairedPost,
+        caption: removeEmDashes(`${repairedPost.caption}\n\nThis can look like ${concreteExample.replace(/\.$/, "")}.`),
+        why_this_works: {
+          ...repairedPost.why_this_works,
+          real_life_example_used: concreteExample
+        }
+      };
+      checklist = qualityChecklist(repairedPost, request);
+    }
+    if (!checklist.ctaAppropriate) {
+      repairedPost = {
+        ...repairedPost,
+        caption: removeEmDashes(`${repairedPost.caption}\n\n${fallbackCta(request, researchBrief)}`)
+      };
+      checklist = qualityChecklist(repairedPost, request);
+    }
+    if (!checklist.soundsLikeLionHeartTherapy && therapistInsight) {
+      repairedPost = {
+        ...repairedPost,
+        caption: removeEmDashes(`${therapistInsight}\n\n${repairedPost.caption}`)
+      };
+      checklist = qualityChecklist(repairedPost, request);
+    }
+    return {
+      ...repairedPost,
+      why_this_works: {
+        ...repairedPost.why_this_works,
+        quality_checklist: checklist
+      }
+    };
   });
+  }
+
+  let initialPosts: GeneratedPost[] = [];
+  try {
+    initialPosts = await runGeneration(prompt);
+  } catch (error) {
+    console.error("[openai][content-generator][initial-generation-failed]", {
+      message: safeErrorMessage(error),
+      stackPreview: error instanceof Error ? error.stack?.slice(0, 900) : undefined
+    });
+  }
+
+  let normalized = normalizePosts(initialPosts);
+  if (normalized.some((post) => !checklistPassed(post.why_this_works?.quality_checklist || qualityChecklist(post, request)))) {
+    const revisionPrompt = `${prompt}
+
+The previous draft failed the quality checklist. Regenerate all posts once.
+Quality requirements:
+- Hooks must be specific, not broad questions.
+- Each post must teach one useful therapist insight.
+- Each post must include one concrete real-life example from its assigned example brief.
+- CTA must match the selected goal: ${request.contentGoal}.
+- Avoid generic AI phrases and promotional wording unless the goal calls for it.
+- The voice must sound like LionHeart Therapy: therapist-led, emotionally specific, practical, warm, and non-generic.
+
+Previous draft:
+${JSON.stringify({ posts: normalized }, null, 2)}
+`;
+    try {
+      normalized = normalizePosts(await runGeneration(revisionPrompt));
+    } catch (error) {
+      console.error("[openai][content-generator][revision-generation-failed]", {
+        message: safeErrorMessage(error),
+        stackPreview: error instanceof Error ? error.stack?.slice(0, 900) : undefined
+      });
+    }
+  }
+
+  return normalized;
 }
 
 export async function generateContentPack(opportunity: ContentOpportunity, brandBrain?: BrandBrain | null, sectionFocus?: string): Promise<ParsedContentPack> {

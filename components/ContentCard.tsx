@@ -113,6 +113,12 @@ export function ContentCard({ item, onUpdate, onRemove }: { item: GeneratedConte
               <dt className="text-xs font-bold uppercase tracking-wide text-[#8a7143]">Suggested template</dt>
               <dd className="mt-1 leading-6">{whyThisWorks.suggested_template}</dd>
             </div>
+            {item.content_angle && (
+              <div>
+                <dt className="text-xs font-bold uppercase tracking-wide text-[#8a7143]">Selected angle</dt>
+                <dd className="mt-1 leading-6">{item.content_angle}</dd>
+              </div>
+            )}
             <div>
               <dt className="text-xs font-bold uppercase tracking-wide text-[#8a7143]">Audience insight</dt>
               <dd className="mt-1 leading-6">{whyThisWorks.audience_insight}</dd>
@@ -125,6 +131,18 @@ export function ContentCard({ item, onUpdate, onRemove }: { item: GeneratedConte
               <div>
                 <dt className="text-xs font-bold uppercase tracking-wide text-[#8a7143]">Framework</dt>
                 <dd className="mt-1 leading-6">{whyThisWorks.selected_framework}</dd>
+              </div>
+            )}
+            {whyThisWorks.therapist_insight && (
+              <div className="sm:col-span-2">
+                <dt className="text-xs font-bold uppercase tracking-wide text-[#8a7143]">Therapist insight</dt>
+                <dd className="mt-1 leading-6">{whyThisWorks.therapist_insight}</dd>
+              </div>
+            )}
+            {whyThisWorks.real_life_example_used && (
+              <div className="sm:col-span-2">
+                <dt className="text-xs font-bold uppercase tracking-wide text-[#8a7143]">Real-life example used</dt>
+                <dd className="mt-1 leading-6">{whyThisWorks.real_life_example_used}</dd>
               </div>
             )}
             <div className="sm:col-span-2">
