@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Check, ExternalLink, Send } from "lucide-react";
+import { Check, ExternalLink, Loader2, RotateCcw, Send, WandSparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { authedFetch } from "@/lib/apiClient";
 import type { GeneratedContent } from "@/lib/types";
@@ -10,6 +10,21 @@ import { StatusPill } from "./StatusPill";
 import { useState } from "react";
 import { SaveToLibraryButton } from "./media-library/SaveToLibraryButton";
 import { ContentLifecycleActions } from "./ContentLifecycleActions";
+
+const improveActions = [
+  { action: "regenerate_hook", label: "Regenerate hook only" },
+  { action: "regenerate_caption", label: "Regenerate caption only" },
+  { action: "regenerate_hashtags", label: "Regenerate hashtags only" },
+  { action: "make_more_emotional", label: "Make more emotional" },
+  { action: "make_more_clinical", label: "Make more clinical" },
+  { action: "make_less_salesy", label: "Make less salesy" },
+  { action: "add_real_life_examples", label: "Add real-life examples" },
+  { action: "shorten_caption", label: "Shorten caption" },
+  { action: "rewrite_instagram", label: "Rewrite for Instagram" },
+  { action: "rewrite_tiktok", label: "Rewrite for TikTok" },
+  { action: "rewrite_pinterest", label: "Rewrite for Pinterest" },
+  { action: "rewrite_carousel", label: "Rewrite as carousel slide copy" }
+];
 
 export function ContentCard({ item, onUpdate, onRemove }: { item: GeneratedContent; onUpdate?: (item: GeneratedContent) => void; onRemove?: (id: string) => void }) {
   const [message, setMessage] = useState("");
@@ -84,7 +99,26 @@ export function ContentCard({ item, onUpdate, onRemove }: { item: GeneratedConte
     setMessage([data.error || "Unable to send this content to Approval Review.", Array.isArray(data.issues) ? data.issues.join(" ") : ""].filter(Boolean).join(" "));
   }
 
+  async function improveContent(action: string) {
+    setBusyAction(action);
+    setMessage("");
+    const response = await authedFetch(`/api/content/${item.id}/improve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action })
+    });
+    const data = await response.json().catch(() => ({}));
+    setBusyAction("");
+    if (!response.ok) {
+      setMessage(data.error || "Unable to improve this content.");
+      return;
+    }
+    onUpdate?.(data.item as GeneratedContent);
+    setMessage(action === "undo_last_change" ? "Last change undone." : "Content updated.");
+  }
+
   const whyThisWorks = item.why_this_works;
+  const revisionCount = Array.isArray(whyThisWorks?.revision_history) ? whyThisWorks.revision_history.length : 0;
 
   return (
     <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -172,6 +206,35 @@ export function ContentCard({ item, onUpdate, onRemove }: { item: GeneratedConte
           Open generated media <ExternalLink size={14} />
         </a>
       )}
+
+      <details className="mt-5 rounded-xl border border-[#e7ddca] bg-[#fffdf8] p-4">
+        <summary className="cursor-pointer text-sm font-bold text-[#172a3a]">
+          <span className="inline-flex items-center gap-2"><WandSparkles size={16} />Improve content</span>
+        </summary>
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {improveActions.map((option) => (
+            <button
+              key={option.action}
+              type="button"
+              className="btn-secondary justify-center"
+              disabled={Boolean(busyAction)}
+              onClick={() => void improveContent(option.action)}
+            >
+              {busyAction === option.action ? <Loader2 className="animate-spin" size={16} /> : <WandSparkles size={16} />}
+              {option.label}
+            </button>
+          ))}
+          <button
+            type="button"
+            className="btn-secondary justify-center"
+            disabled={Boolean(busyAction) || !revisionCount}
+            onClick={() => void improveContent("undo_last_change")}
+          >
+            {busyAction === "undo_last_change" ? <Loader2 className="animate-spin" size={16} /> : <RotateCcw size={16} />}
+            Undo last change
+          </button>
+        </div>
+      </details>
 
       <div className="mt-5 flex flex-wrap gap-2">
         <button className="btn-primary" onClick={sendToApprovalReview} disabled={sending}>

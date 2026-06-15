@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { CalendarPlus, CheckCircle2, Download, Edit3, ExternalLink, Loader2, Palette, RefreshCw, RotateCcw, Search, Send, Sparkles } from "lucide-react";
+import { CalendarPlus, CheckCircle2, Download, Edit3, ExternalLink, Loader2, Palette, RefreshCw, RotateCcw, Search, Send, Sparkles, WandSparkles } from "lucide-react";
 import { authedFetch } from "@/lib/apiClient";
 import { CANVA_TEMPLATES, type CanvaTemplateRegistryItem } from "@/lib/canvaTemplates";
 import { CopyButton } from "@/components/CopyButton";
@@ -26,6 +26,26 @@ const sectionOptions: Array<{ key: ContentPackSectionKey; label: string }> = [
   { key: "product_cta", label: "Product CTA" },
   { key: "therapy_service_cta", label: "Therapy service CTA" },
   { key: "safety_disclaimer", label: "Safety disclaimer" }
+];
+
+const improveActions = [
+  { action: "regenerate_caption", label: "Regenerate selected section" },
+  { action: "make_more_emotional", label: "Make more emotional" },
+  { action: "make_more_clinical", label: "Make more clinical" },
+  { action: "make_less_salesy", label: "Make less salesy" },
+  { action: "add_real_life_examples", label: "Add real-life examples" },
+  { action: "shorten_caption", label: "Shorten section" },
+  { action: "rewrite_instagram", label: "Rewrite for Instagram" },
+  { action: "rewrite_tiktok", label: "Rewrite for TikTok" },
+  { action: "rewrite_pinterest", label: "Rewrite for Pinterest" },
+  { action: "rewrite_carousel", label: "Rewrite as carousel slide copy" }
+];
+
+const slideImproveActions = [
+  { action: "regenerate_slide", label: "Regenerate this slide" },
+  { action: "shorten_slide", label: "Make this slide shorter" },
+  { action: "make_slide_more_emotional", label: "Make this slide more emotional" },
+  { action: "make_slide_clearer", label: "Make this slide clearer" }
 ];
 
 type Filters = {
@@ -437,6 +457,7 @@ export function ApprovalReviewClient() {
   const [selectedId, setSelectedId] = useState("");
   const [scheduleDate, setScheduleDate] = useState(new Date().toISOString().slice(0, 10));
   const [selectedSection, setSelectedSection] = useState<ContentPackSectionKey>("instagram_caption");
+  const [selectedImproveAction, setSelectedImproveAction] = useState("make_more_emotional");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
@@ -570,6 +591,26 @@ export function ApprovalReviewClient() {
     setPacks((current) => current.map((pack) => pack.id === packId ? updated : pack));
     setSelectedId(packId);
     setMessage("Section regenerated.");
+  }
+
+  async function improvePack(packId: string, payload: Record<string, unknown>, success: string) {
+    setBusy(`${packId}:improve:${String(payload.action || "")}:${String(payload.fieldKey || payload.sectionKey || "")}`);
+    setMessage("");
+    const response = await authedFetch(`/api/content-packs/${packId}/improve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await readApiResponse(response);
+    setBusy("");
+    if (!response.ok) {
+      setMessage(typeof data.error === "string" ? data.error : "Unable to improve content pack.");
+      return;
+    }
+    const updated = data.pack as ContentPack;
+    setPacks((current) => current.map((pack) => pack.id === packId ? updated : pack));
+    setSelectedId(packId);
+    setMessage(success);
   }
 
   async function schedule(pack: ContentPack) {
@@ -735,7 +776,11 @@ export function ApprovalReviewClient() {
                 {selectedTemplate?.canva_template_link && <a className="btn-secondary" href={selectedTemplate.canva_template_link} target="_blank" rel="noreferrer"><ExternalLink size={16} />Open Canva Template</a>}
               </div>
 
-              <CanvaSlideCopyCenter fields={templatePreview} />
+              <CanvaSlideCopyCenter
+                fields={templatePreview}
+                busy={busy.startsWith(`${selected.id}:improve`)}
+                onImprove={(fieldKey, action) => improvePack(selected.id, { target: "slide", fieldKey, action }, "Canva slide updated.")}
+              />
               <TemplateDetails template={selectedTemplate} fields={templatePreview} />
               <AdvancedDeveloperTools
                 selected={selected}
@@ -756,6 +801,35 @@ export function ApprovalReviewClient() {
                   {busy.startsWith(selected.id) ? <Loader2 className="animate-spin" size={16} /> : <RefreshCw size={16} />}
                   Regenerate Section
                 </button>
+                <details className="rounded-2xl border border-[#eadfc8] bg-[#fffdf8] p-4">
+                  <summary className="cursor-pointer text-sm font-bold text-[#77633c]">Improve selected section</summary>
+                  <div className="mt-4 grid gap-2">
+                    <label>
+                      <span className="label">Improvement</span>
+                      <select className="field mt-1" value={selectedImproveAction} onChange={(event) => setSelectedImproveAction(event.target.value)}>
+                        {improveActions.map((option) => <option key={option.action} value={option.action}>{option.label}</option>)}
+                      </select>
+                    </label>
+                    <button
+                      className="btn-secondary"
+                      type="button"
+                      onClick={() => improvePack(selected.id, { target: "section", sectionKey: selectedSection, action: selectedImproveAction }, "Content pack section updated.")}
+                      disabled={busy.startsWith(selected.id)}
+                    >
+                      {busy.startsWith(`${selected.id}:improve`) ? <Loader2 className="animate-spin" size={16} /> : <WandSparkles size={16} />}
+                      Improve Section
+                    </button>
+                    <button
+                      className="btn-secondary"
+                      type="button"
+                      onClick={() => improvePack(selected.id, { action: "undo_last_change" }, "Last content pack change undone.")}
+                      disabled={busy.startsWith(selected.id) || !Array.isArray(selected.metadata?.revisionHistory) || selected.metadata.revisionHistory.length === 0}
+                    >
+                      <RotateCcw size={16} />
+                      Undo last change
+                    </button>
+                  </div>
+                </details>
               </div>
             </section>
           ) : null}
@@ -918,7 +992,15 @@ function TemplateDetails({ template, fields }: { template: CanvaTemplate | null;
   );
 }
 
-function CanvaSlideCopyCenter({ fields }: { fields: Array<{ key: string; label: string; value: string }> }) {
+function CanvaSlideCopyCenter({
+  fields,
+  busy,
+  onImprove
+}: {
+  fields: Array<{ key: string; label: string; value: string }>;
+  busy: boolean;
+  onImprove: (fieldKey: string, action: string) => void;
+}) {
   return (
     <div className="mt-4 rounded-2xl bg-[#fffdf8] p-4 ring-1 ring-[#eadfc8]">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -938,6 +1020,23 @@ function CanvaSlideCopyCenter({ fields }: { fields: Array<{ key: string; label: 
               <CopyButton text={field.value} label="Copy" />
             </div>
             <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-[#20313f]">{field.value || "Generated content will appear here."}</p>
+            <details className="mt-3 rounded-xl bg-[#f8f5ee] p-3">
+              <summary className="cursor-pointer text-xs font-bold uppercase tracking-wide text-[#77633c]">Improve this slide</summary>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {slideImproveActions.map((option) => (
+                  <button
+                    key={option.action}
+                    className="btn-secondary justify-center text-xs"
+                    type="button"
+                    disabled={busy}
+                    onClick={() => onImprove(field.key, option.action)}
+                  >
+                    {busy ? <Loader2 className="animate-spin" size={14} /> : <WandSparkles size={14} />}
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </details>
           </article>
         ))}
       </div>

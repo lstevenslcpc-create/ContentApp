@@ -193,6 +193,9 @@ export type ContentWhyThisWorks = {
   therapist_insight?: string;
   real_life_example_used?: string;
   quality_checklist?: ContentQualityChecklist;
+  revision_history?: Array<Record<string, unknown>>;
+  last_revision_action?: string;
+  last_revision_at?: string;
 };
 
 export type ContentQualityChecklist = {
@@ -286,7 +289,7 @@ export type ContentPack = {
   product_tie_in?: string | null;
   service_tie_in?: string | null;
   clinical_sensitivity?: "low" | "medium" | "high" | string | null;
-  design_status?: "not_started" | "ready_for_canva" | "designed_in_canva" | string | null;
+  design_status?: "not_started" | "ready_for_canva" | "design_started" | "designed_in_canva" | string | null;
   canva_template_id?: string | null;
   pack: ContentPackBody;
   canva_brief?: Record<string, unknown>;
