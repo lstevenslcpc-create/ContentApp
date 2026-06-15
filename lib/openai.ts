@@ -3,7 +3,7 @@ import type { BrandBrain, BusinessProfile, ContentGenerationRequest, ContentInte
 import { buildContentPrompt } from "./contentPrompt";
 import { formatBrandBrainForPrompt } from "./brandBrain/format";
 import { buildContentIntelligenceBrief } from "./contentResearch";
-import { selectAnglesForGeneration } from "./contentAngles";
+import { selectAnglesForGeneration, type ContentAngle } from "./contentAngles";
 import { buildFrameworkBrief } from "./psychologyFrameworkEngine";
 import { buildExampleBrief } from "./realLifeExampleEngine";
 import { buildTherapistInsightBrief } from "./therapistInsightEngine";
@@ -572,13 +572,15 @@ function checklistPassed(checklist: ContentQualityChecklist) {
   return Object.values(checklist).every(Boolean);
 }
 
-export async function generateStructuredContent(profile: BusinessProfile, request: ContentGenerationRequest, brandBrain?: BrandBrain | null): Promise<GeneratedPost[]> {
+export async function generateStructuredContent(profile: BusinessProfile, request: ContentGenerationRequest, brandBrain?: BrandBrain | null, plannedAnglesOverride?: ContentAngle[]): Promise<GeneratedPost[]> {
   if (!process.env.OPENAI_API_KEY) {
     throw new Error("OPENAI_API_KEY is missing. Add it to generate content.");
   }
 
   const researchBrief = await buildContentIntelligenceBrief({ request, brandBrain });
-  const plannedAngles = selectAnglesForGeneration(request.topic, request.contentGoal, request.numberOfPosts || 1);
+  const plannedAngles = plannedAnglesOverride?.length
+    ? plannedAnglesOverride
+    : selectAnglesForGeneration(request.topic, request.contentGoal, request.numberOfPosts || 1);
   const frameworkBriefs = plannedAngles.map((angle) => buildFrameworkBrief(request.topic, angle.name, request.contentGoal));
   const exampleBriefs = plannedAngles.map((angle) => buildExampleBrief(request.topic, angle.name, request.contentGoal));
   const therapistInsightBriefs = plannedAngles.map((angle) => buildTherapistInsightBrief(request.topic, angle.name, request.contentGoal));
@@ -590,13 +592,14 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
       client.chat.completions.create({
         model: process.env.OPENAI_MODEL || "gpt-4o-mini",
         temperature: 0.75,
+        max_tokens: 3500,
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: "Return only valid JSON. Do not include markdown." },
           { role: "user", content: userPrompt }
         ]
       }),
-      45000,
+      30000,
       "OpenAI content generation"
     );
 
@@ -770,7 +773,7 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
   }
 
   let normalized = normalizePosts(initialPosts);
-  if (normalized.some((post) => !checklistPassed(post.why_this_works?.quality_checklist || qualityChecklist(post, request)))) {
+  if (request.numberOfPosts <= 1 && normalized.some((post) => !checklistPassed(post.why_this_works?.quality_checklist || qualityChecklist(post, request)))) {
     const revisionPrompt = `${prompt}
 
 The previous draft failed the quality checklist. Regenerate all posts once.

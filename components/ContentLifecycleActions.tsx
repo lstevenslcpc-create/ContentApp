@@ -6,12 +6,14 @@ import { Archive, MoreHorizontal, RotateCcw, Trash2 } from "lucide-react";
 export function ContentLifecycleActions({
   archived,
   busy,
+  deleteDetail,
   onArchive,
   onRestore,
   onDelete
 }: {
   archived?: boolean;
   busy?: boolean;
+  deleteDetail?: string;
   onArchive?: () => void;
   onRestore?: () => void;
   onDelete?: () => void;
@@ -48,6 +50,7 @@ export function ContentLifecycleActions({
         <div className="fixed inset-0 z-50 grid place-items-center bg-[#172a3a]/45 p-4">
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-premium">
             <p className="text-lg font-bold text-[#172a3a]">Delete this content permanently? This cannot be undone.</p>
+            {deleteDetail ? <p className="mt-3 text-sm leading-6 text-[#6f766f]">{deleteDetail}</p> : null}
             <div className="mt-5 flex flex-wrap justify-end gap-2">
               <button className="btn-secondary" type="button" onClick={() => setConfirming(false)}>Cancel</button>
               <button

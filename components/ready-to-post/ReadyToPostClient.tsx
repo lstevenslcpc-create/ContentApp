@@ -386,7 +386,6 @@ function PostingCard({ pack, plans, busy, onStatus, onArchive, onDelete }: {
       <div className="mt-4 grid gap-2 sm:grid-cols-2">
         <CopyButton text={captionWithoutHashtags(caption) || caption} label="Copy caption" />
         <CopyButton text={hashtagText} label="Copy hashtags" />
-        <CopyButton text={canvaPackageJson} label="Copy Canva package JSON" />
         {canvaLink ? <a className="btn-secondary" href={canvaLink} target="_blank" rel="noreferrer"><ExternalLink size={16} />Open Canva template</a> : null}
         {socialLinks().map((link) => <a key={link.href} className="btn-secondary" href={link.href} target="_blank" rel="noreferrer"><ExternalLink size={16} />{link.label}</a>)}
         <button className="btn-primary bg-[#172a3a] hover:bg-[#22384a]" disabled={busy} onClick={() => onStatus(pack, "posted")}><Send size={16} />Mark posted</button>
@@ -399,6 +398,13 @@ function PostingCard({ pack, plans, busy, onStatus, onArchive, onDelete }: {
           onDelete={() => onDelete(pack)}
         />
       </div>
+
+      <details className="mt-4 rounded-2xl border border-[#eadfc8] bg-[#fffdf8] p-4">
+        <summary className="cursor-pointer text-sm font-bold text-[#77633c]">Advanced Developer Tools</summary>
+        <div className="mt-4">
+          <CopyButton text={canvaPackageJson} label="Copy Canva package JSON" />
+        </div>
+      </details>
     </article>
   );
 }

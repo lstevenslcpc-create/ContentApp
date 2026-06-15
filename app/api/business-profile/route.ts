@@ -47,7 +47,21 @@ export async function POST(request: Request) {
       call_to_action: body.call_to_action || null
     };
 
-    const { data, error } = await supabase.from("business_profiles").insert(payload).select("*").single();
+    const { data: existing, error: existingError } = await supabase
+      .from("business_profiles")
+      .select("id")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingError) throw existingError;
+
+    const query = existing?.id
+      ? supabase.from("business_profiles").update(payload).eq("user_id", user.id).eq("id", existing.id)
+      : supabase.from("business_profiles").insert(payload);
+
+    const { data, error } = await query.select("*").single();
     if (error) throw error;
     return NextResponse.json({ profile: data });
   } catch (error) {

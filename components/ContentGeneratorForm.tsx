@@ -6,15 +6,19 @@ import { CONTENT_GOAL_IDS } from "@/lib/contentGoalConfig";
 import type { GeneratedContent } from "@/lib/types";
 import { ContentCard } from "./ContentCard";
 
+const MAX_BATCH_SIZE = 3;
+
 export function ContentGeneratorForm() {
   const [posts, setPosts] = useState<GeneratedContent[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showArchived, setShowArchived] = useState(false);
+  const [progress, setProgress] = useState("");
 
   async function submit(formData: FormData) {
     setLoading(true);
     setError("");
+    setProgress("");
     setPosts([]);
     const topic = String(formData.get("topic") || "").trim();
     if (!topic) {
@@ -23,24 +27,43 @@ export function ContentGeneratorForm() {
       return;
     }
 
+    const requestedPosts = Number(formData.get("numberOfPosts"));
     const payload = {
       topic,
       platform: formData.get("platform"),
       contentType: formData.get("contentType"),
       contentGoal: formData.get("contentGoal"),
-      numberOfPosts: Number(formData.get("numberOfPosts"))
+      numberOfPosts: requestedPosts
     };
-    const response = await authedFetch("/api/content/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-    const data = await response.json();
-    setLoading(false);
-    if (!response.ok) setError(data.error || "Generation failed.");
-    else {
-      setPosts(data.posts || []);
-      if (data.warning) setError(data.warning);
+
+    const batchCount = Math.ceil(requestedPosts / MAX_BATCH_SIZE);
+    const combinedPosts: GeneratedContent[] = [];
+    const warnings: string[] = [];
+
+    try {
+      for (let batchIndex = 0; batchIndex < batchCount; batchIndex += 1) {
+        const angleOffset = batchIndex * MAX_BATCH_SIZE;
+        const batchSize = Math.min(MAX_BATCH_SIZE, requestedPosts - angleOffset);
+        setProgress(batchCount > 1 ? `Generating batch ${batchIndex + 1} of ${batchCount}...` : "Generating content...");
+        const response = await authedFetch("/api/content/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...payload, numberOfPosts: batchSize, angleOffset })
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || `Generation failed on batch ${batchIndex + 1}.`);
+        }
+        combinedPosts.push(...(data.posts || []));
+        setPosts([...combinedPosts]);
+        if (data.warning) warnings.push(data.warning);
+      }
+      setError(warnings.join(" "));
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Generation failed.");
+    } finally {
+      setLoading(false);
+      setProgress("");
     }
   }
 
@@ -56,6 +79,7 @@ export function ContentGeneratorForm() {
           <label><span className="label">Content goal</span><select className="field mt-1" name="contentGoal">{CONTENT_GOAL_IDS.map((x) => <option key={x}>{x}</option>)}</select></label>
           <label><span className="label">Number of posts</span><select className="field mt-1" name="numberOfPosts">{[1,5,7,30].map((x) => <option key={x}>{x}</option>)}</select></label>
           <button className="btn-primary" disabled={loading}>{loading ? "Generating..." : "Generate Content"}</button>
+          {progress && <p className="rounded-lg bg-blue-50 p-3 text-sm font-semibold text-blue-700">{progress}</p>}
           {error && <p className="rounded-lg bg-rose-50 p-3 text-sm font-semibold text-rose-700">{error}</p>}
           <p className="text-xs leading-5 text-slate-500">Canva workflow: generated visual ideas are written as Canva-ready creative directions. API-level Canva automation can be added in a future phase with official integration and templates.</p>
         </div>

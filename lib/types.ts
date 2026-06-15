@@ -409,6 +409,7 @@ export type ContentGenerationRequest = {
   contentType: string;
   contentGoal: string;
   numberOfPosts: number;
+  angleOffset?: number;
   intelligenceBrief?: {
     topic: string;
     audience: string;

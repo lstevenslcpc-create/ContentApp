@@ -95,6 +95,14 @@ export async function PATCH(request: Request, context: RouteContext) {
     const id = await paramsId(context);
     const body = await request.json();
     const updates: Record<string, unknown> = {};
+    let existingPack: Record<string, unknown> | undefined;
+
+    async function getExistingPack() {
+      if (!existingPack) {
+        existingPack = await loadPack(user.id, id);
+      }
+      return existingPack as Record<string, unknown>;
+    }
 
     if (body.status) {
       if (!allowedStatuses.includes(body.status)) {
@@ -123,11 +131,15 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     if (body.metadata && typeof body.metadata === "object") {
-      updates.metadata = body.metadata;
+      const existing = await getExistingPack();
+      updates.metadata = {
+        ...(existing.metadata && typeof existing.metadata === "object" ? existing.metadata as Record<string, unknown> : {}),
+        ...(body.metadata as Record<string, unknown>)
+      };
     }
 
     if (typeof body.archived === "boolean") {
-      const existing = await loadPack(user.id, id);
+      const existing = await getExistingPack();
       updates.metadata = {
         ...(existing.metadata && typeof existing.metadata === "object" ? existing.metadata as Record<string, unknown> : {}),
         ...(updates.metadata && typeof updates.metadata === "object" ? updates.metadata : {}),

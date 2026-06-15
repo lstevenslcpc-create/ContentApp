@@ -59,6 +59,9 @@ export function ContentCard({ item, onUpdate, onRemove }: { item: GeneratedConte
       setMessage(data.error || "Unable to delete this content.");
       return;
     }
+    if (data.deletedRelatedContentPacks) {
+      setMessage(`Content deleted. ${data.deletedRelatedContentPacks} related Approval Review pack was also removed.`);
+    }
     onRemove?.(item.id);
   }
 
@@ -178,6 +181,7 @@ export function ContentCard({ item, onUpdate, onRemove }: { item: GeneratedConte
         <ContentLifecycleActions
           archived={Boolean(item.archived)}
           busy={Boolean(busyAction)}
+          deleteDetail="If this generated content already has an Approval Review content pack, that pack and any calendar references to it will also be removed."
           onArchive={() => void setArchived(true)}
           onRestore={() => void setArchived(false)}
           onDelete={() => void deleteContent()}

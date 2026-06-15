@@ -68,6 +68,33 @@ export async function DELETE(request: Request, context: RouteContext) {
     const id = await paramsId(context);
     const supabase = getSupabaseAdmin();
 
+    const { data: relatedPacks, error: relatedError } = await supabase
+      .from("content_packs")
+      .select("id")
+      .eq("user_id", user.id)
+      .contains("metadata", { generatedContentId: id });
+
+    if (relatedError) throw relatedError;
+    const relatedPackIds = (relatedPacks || []).map((pack) => pack.id).filter(Boolean);
+
+    if (relatedPackIds.length) {
+      const { error: calendarError } = await supabase
+        .from("content_calendar_plans")
+        .update({ content_pack_id: null })
+        .eq("user_id", user.id)
+        .in("content_pack_id", relatedPackIds);
+
+      if (calendarError) throw calendarError;
+
+      const { error: packDeleteError } = await supabase
+        .from("content_packs")
+        .delete()
+        .eq("user_id", user.id)
+        .in("id", relatedPackIds);
+
+      if (packDeleteError) throw packDeleteError;
+    }
+
     const { error } = await supabase
       .from("generated_content")
       .delete()
@@ -75,7 +102,7 @@ export async function DELETE(request: Request, context: RouteContext) {
       .eq("id", id);
 
     if (error) throw error;
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, deletedRelatedContentPacks: relatedPackIds.length });
   } catch (error) {
     const authResponse = authErrorResponse(error);
     if (authResponse) return authResponse;

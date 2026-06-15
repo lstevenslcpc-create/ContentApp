@@ -125,6 +125,8 @@ const starterOpportunities: ContentOpportunity[] = [
   }
 ];
 
+const showDeveloperDiagnostics = process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_SHOW_DEBUG === "true";
+
 const angleIcons = {
   tiktok_reels: Video,
   instagram_carousel: Sparkles,
@@ -422,26 +424,28 @@ export function ContentIntelligenceClient() {
             Session diagnostics: token sent {diagnostics.authHeaderReceived || diagnostics.authCookieReceived ? "yes" : "no"} · user detected {diagnostics.userDetected ? "yes" : "no"} · OpenAI {diagnostics.OPENAI_API_KEY ? "ready" : "missing"} · Supabase {diagnostics.SUPABASE_URL && diagnostics.SUPABASE_SERVICE_ROLE_KEY ? "ready" : "missing"} · Content schema {diagnostics.contentOpportunitiesSchemaFieldsExist ? "ready" : "missing"} · Brand Brain schema {diagnostics.brandBrainsSchemaFieldsExist ? "ready" : "missing"}
           </p>
         )}
-        {apiDebug && (
-          <div className="mt-3 rounded-xl border border-[#eadfc8] bg-[#fffdf8] p-3 text-xs leading-5 text-[#77633c]">
-            <p className="font-bold text-[#172a3a]">Temporary API debug</p>
-            <p>API status code: {apiDebug.statusCode ?? "unknown"}</p>
-            <p>Current checkpoint: {apiDebug.checkpoint || "unknown"}</p>
-            <p>Runtime: {apiDebug.runtimeType || "unknown"} · Node: {apiDebug.nodeVersion || "unknown"}</p>
-            <p>OpenAI key: {apiDebug.keyExists ? "exists" : "missing"} {apiDebug.keyPreview ? `(starts ${apiDebug.keyPreview})` : ""}</p>
-            <p>OpenAI client initialized: {apiDebug.openAiClientInitialized ? "yes" : "no"}</p>
-            <p>Direct fetch minimal test succeeded: {apiDebug.directFetchMinimalTestSucceeded ? "yes" : "no"}</p>
-            <p>OpenAI response received: {apiDebug.openAiResponseReceived ? "yes" : "no"}</p>
-            <p>Model used: {apiDebug.modelUsed || "unknown"}</p>
-            <p>OpenAI status code: {apiDebug.openAiStatusCode ?? "unknown"}</p>
-            <p>OpenAI error type/code: {[apiDebug.openAiErrorType, apiDebug.openAiErrorCode].filter(Boolean).join(" / ") || "none"}</p>
-            <p>Minimal OpenAI test succeeded: {apiDebug.minimalTestSucceeded ? "yes" : "no"}</p>
-            <p>Opportunities array parsed: {apiDebug.opportunitiesArrayParsed ? "yes" : "no"}</p>
-            <p>Opportunity count: {apiDebug.opportunityCount ?? 0}</p>
-            <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-lg bg-[#172a3a] p-3 text-[11px] leading-5 text-[#f3ecdf]">
-              {JSON.stringify(apiDebug.rawJson, null, 2)}
-            </pre>
-          </div>
+        {apiDebug && showDeveloperDiagnostics && (
+          <details className="mt-3 rounded-xl border border-[#eadfc8] bg-[#fffdf8] p-3 text-xs leading-5 text-[#77633c]">
+            <summary className="cursor-pointer font-bold text-[#172a3a]">Developer Diagnostics</summary>
+            <div className="mt-3">
+              <p>API status code: {apiDebug.statusCode ?? "unknown"}</p>
+              <p>Current checkpoint: {apiDebug.checkpoint || "unknown"}</p>
+              <p>Runtime: {apiDebug.runtimeType || "unknown"} · Node: {apiDebug.nodeVersion || "unknown"}</p>
+              <p>OpenAI key present: {apiDebug.keyExists ? "yes" : "no"}</p>
+              <p>OpenAI client initialized: {apiDebug.openAiClientInitialized ? "yes" : "no"}</p>
+              <p>Direct fetch minimal test succeeded: {apiDebug.directFetchMinimalTestSucceeded ? "yes" : "no"}</p>
+              <p>OpenAI response received: {apiDebug.openAiResponseReceived ? "yes" : "no"}</p>
+              <p>Model used: {apiDebug.modelUsed || "unknown"}</p>
+              <p>OpenAI status code: {apiDebug.openAiStatusCode ?? "unknown"}</p>
+              <p>OpenAI error type/code: {[apiDebug.openAiErrorType, apiDebug.openAiErrorCode].filter(Boolean).join(" / ") || "none"}</p>
+              <p>Minimal OpenAI test succeeded: {apiDebug.minimalTestSucceeded ? "yes" : "no"}</p>
+              <p>Opportunities array parsed: {apiDebug.opportunitiesArrayParsed ? "yes" : "no"}</p>
+              <p>Opportunity count: {apiDebug.opportunityCount ?? 0}</p>
+              <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-lg bg-[#172a3a] p-3 text-[11px] leading-5 text-[#f3ecdf]">
+                {JSON.stringify(apiDebug.rawJson, null, 2)}
+              </pre>
+            </div>
+          </details>
         )}
       </section>
 
