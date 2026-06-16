@@ -581,10 +581,6 @@ function qualityChecklist(post: GeneratedPost, request: ContentGenerationRequest
   };
 }
 
-function checklistPassed(checklist: ContentQualityChecklist) {
-  return Object.values(checklist).every(Boolean);
-}
-
 export async function generateStructuredContent(profile: BusinessProfile, request: ContentGenerationRequest, brandBrain?: BrandBrain | null, plannedAnglesOverride?: ContentAngle[]): Promise<GeneratedPost[]> {
   if (!process.env.OPENAI_API_KEY) {
     throw new Error("OPENAI_API_KEY is missing. Add it to generate content.");
@@ -606,14 +602,14 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
       client.chat.completions.create({
         model: process.env.OPENAI_MODEL || "gpt-4o-mini",
         temperature: 0.75,
-        max_tokens: 3500,
+        max_tokens: Math.min(3600, Math.max(1600, 1800 * (request.numberOfPosts || 1))),
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: "Return only valid JSON. Do not include markdown." },
           { role: "user", content: userPrompt }
         ]
       }),
-      30000,
+      18000,
       "OpenAI content generation"
     );
 
@@ -806,31 +802,6 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
   }
 
   let normalized = normalizePosts(initialPosts);
-  if (request.numberOfPosts <= 1 && normalized.some((post) => !checklistPassed(post.why_this_works?.quality_checklist || qualityChecklist(post, request)))) {
-    const revisionPrompt = `${prompt}
-
-The previous draft failed the quality checklist. Regenerate all posts once.
-Quality requirements:
-- Hooks must be specific, not broad questions.
-- Each post must teach one useful therapist insight.
-- Each post must include one concrete real-life example from its assigned example brief.
-- CTA must match the selected goal: ${request.contentGoal}.
-- Avoid generic AI phrases and promotional wording unless the goal calls for it.
-- The voice must sound like LionHeart Therapy: therapist-led, emotionally specific, practical, warm, and non-generic.
-
-Previous draft:
-${JSON.stringify({ posts: normalized }, null, 2)}
-`;
-    try {
-      normalized = normalizePosts(await runGeneration(revisionPrompt));
-    } catch (error) {
-      console.error("[openai][content-generator][revision-generation-failed]", {
-        message: safeErrorMessage(error),
-        stackPreview: error instanceof Error ? error.stack?.slice(0, 900) : undefined
-      });
-    }
-  }
-
   return normalized;
 }
 

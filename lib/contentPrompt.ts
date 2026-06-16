@@ -4,7 +4,7 @@ import type { ExampleBrief } from "./realLifeExampleEngine";
 import type { TherapistInsightBrief } from "./therapistInsightEngine";
 import type { TherapistObservationBrief } from "./therapistObservationEngine";
 import type { BrandBrain, BusinessProfile, ContentGenerationRequest, ContentIntelligenceBrief } from "./types";
-import { formatBrandBrainForPrompt } from "./brandBrain/format";
+import { formatCompactBrandBrainForPrompt } from "./brandBrain/format";
 import { formatContentGoalForPrompt } from "./contentGoalConfig";
 
 function followerGrowthInstructions(request: ContentGenerationRequest) {
@@ -210,7 +210,7 @@ Saved Content Opportunity Brief:
 Build the content pack around this brief. Keep each post distinct, but make the whole pack feel like a strategic campaign.
 ` : ""}
 
-${formatBrandBrainForPrompt(brandBrain)}
+${formatCompactBrandBrainForPrompt(brandBrain)}
 
 Content rules:
 - Make outputs feel deeply customized to ${brandBrain?.brand_name || profile.business_name}, never generic wellness AI.

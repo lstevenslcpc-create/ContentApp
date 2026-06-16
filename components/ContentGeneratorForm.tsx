@@ -6,7 +6,19 @@ import { CONTENT_GOAL_IDS } from "@/lib/contentGoalConfig";
 import type { GeneratedContent } from "@/lib/types";
 import { ContentCard } from "./ContentCard";
 
-const MAX_BATCH_SIZE = 3;
+const MAX_BATCH_SIZE = 2;
+
+async function readGenerationResponse(response: Response) {
+  const text = await response.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    return {
+      error: `Generation request returned ${response.status} ${response.statusText || "server error"} instead of JSON. ${text.slice(0, 180)}`
+    };
+  }
+}
 
 export function ContentGeneratorForm() {
   const [posts, setPosts] = useState<GeneratedContent[]>([]);
@@ -50,17 +62,18 @@ export function ContentGeneratorForm() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...payload, numberOfPosts: batchSize, angleOffset })
         });
-        const data = await response.json();
+        const data = await readGenerationResponse(response);
         if (!response.ok) {
-          throw new Error(data.error || `Generation failed on batch ${batchIndex + 1}.`);
+          const details = typeof data.details === "object" && data.details !== null ? data.details as Record<string, unknown> : {};
+          throw new Error(String(data.error || details.message || `Generation failed on batch ${batchIndex + 1}.`));
         }
-        combinedPosts.push(...(data.posts || []));
+        combinedPosts.push(...(Array.isArray(data.posts) ? data.posts as GeneratedContent[] : []));
         setPosts([...combinedPosts]);
-        if (data.warning) warnings.push(data.warning);
+        if (typeof data.warning === "string" && data.warning) warnings.push(data.warning);
       }
       setError(warnings.join(" "));
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Generation failed.");
+      setError(error instanceof Error ? error.message : "Generation failed. Check the server console for details.");
     } finally {
       setLoading(false);
       setProgress("");

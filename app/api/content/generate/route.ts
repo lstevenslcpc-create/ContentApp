@@ -5,7 +5,18 @@ import { generateStructuredContent } from "@/lib/openai";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import type { BusinessProfile, BrandBrain, ContentGenerationRequest } from "@/lib/types";
 
-const MAX_BATCH_SIZE = 3;
+const MAX_BATCH_SIZE = 2;
+
+function errorDetails(error: unknown) {
+  const maybe = typeof error === "object" && error !== null ? error as Record<string, unknown> : {};
+  return {
+    message: error instanceof Error ? error.message : String(maybe.message || error || "Unknown error"),
+    name: error instanceof Error ? error.name : typeof maybe.name === "string" ? maybe.name : undefined,
+    status: typeof maybe.status === "number" || typeof maybe.status === "string" ? maybe.status : undefined,
+    code: typeof maybe.code === "string" ? maybe.code : undefined,
+    stackPreview: error instanceof Error ? error.stack?.slice(0, 900) : undefined
+  };
+}
 
 function chunkAngles<T>(items: T[], size: number) {
   const chunks: T[][] = [];
@@ -35,7 +46,25 @@ async function generateAndSaveBatch({
   angleOffset: number;
 }) {
   const plannedAngles = selectAnglesForGeneration(topic, body.contentGoal, angleOffset + numberOfPosts).slice(angleOffset, angleOffset + numberOfPosts);
+  console.info("[content-generate][batch-start]", {
+    topic,
+    userId,
+    numberOfPosts,
+    angleOffset,
+    platform: body.platform,
+    contentType: body.contentType,
+    contentGoal: body.contentGoal,
+    plannedAngles: plannedAngles.map((angle) => angle.name)
+  });
+
   const posts = await generateStructuredContent(profile, { ...body, topic, numberOfPosts, angleOffset }, brandBrain, plannedAngles);
+  console.info("[content-generate][batch-generated]", {
+    topic,
+    numberOfPosts,
+    angleOffset,
+    generatedCount: posts.length,
+    hasTherapistObservation: posts.every((post) => Boolean(post.why_this_works?.therapist_observation || post.content_intelligence_brief?.therapistObservation))
+  });
   const rows = posts.map((post) => ({
     business_profile_id: profile.id,
     user_id: userId,
@@ -68,7 +97,10 @@ async function generateAndSaveBatch({
       return fallbackRow;
     });
     const retry = await supabase.from("generated_content").insert(fallbackRows).select("*");
-    if (retry.error) throw retry.error;
+    if (retry.error) {
+      console.error("[content-generate][supabase-fallback-insert-failed]", errorDetails(retry.error));
+      throw retry.error;
+    }
     return {
       posts: (retry.data || []).map((post, index) => ({
         ...post,
@@ -80,7 +112,10 @@ async function generateAndSaveBatch({
       warning: `Content generated, but Supabase is missing one of the latest generated_content columns: ${error.message}`
     };
   }
-  if (error) throw error;
+  if (error) {
+    console.error("[content-generate][supabase-insert-failed]", errorDetails(error));
+    throw error;
+  }
   return {
     posts: (data || []).map((post, index) => ({
       ...post,
@@ -155,8 +190,13 @@ export async function POST(request: Request) {
       warning: warnings.join(" ")
     });
   } catch (error) {
+    console.error("[content-generate][route-failed]", errorDetails(error));
     const authResponse = authErrorResponse(error);
     if (authResponse) return authResponse;
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to generate content." }, { status: 500 });
+    const details = errorDetails(error);
+    return NextResponse.json({
+      error: details.message || "Unable to generate content.",
+      details
+    }, { status: 500 });
   }
 }

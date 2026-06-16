@@ -84,3 +84,36 @@ Clinical safety:
 Apply this Brand Brain to captions, hooks, video scripts, hashtags, SEO language, and Canva-ready visual directions.
 `;
 }
+
+export function formatCompactBrandBrainForPrompt(brandBrain?: BrandBrain | null) {
+  if (!brandBrain) {
+    return "No Brand Brain saved yet. Use the business profile only.";
+  }
+
+  const safeBrandBrain = mergeBrandBrain(brandBrain);
+  const audienceNames = safeBrandBrain.audience_profiles.map((audience) => audience.name).slice(0, 8).join(", ");
+  const audiencePainPoints = Array.from(new Set(safeBrandBrain.audience_profiles.flatMap((audience) => audience.pain_points))).slice(0, 14).join(", ");
+  const services = safeBrandBrain.therapy_services.map((service) => `${service.name}: ${service.cta}`).slice(0, 8).join(" | ");
+  const products = safeBrandBrain.product_catalog.map((product) => `${product.name}: ${product.transformation_outcome}`).slice(0, 8).join(" | ");
+
+  return `
+Brand Brain Summary:
+- Brand: ${safeBrandBrain.brand_name}
+- Mission: ${safeBrandBrain.mission || "Not provided"}
+- Emotional tone: ${safeBrandBrain.voice_tone.emotional_tone}
+- Sentence style: ${safeBrandBrain.voice_tone.sentence_style}
+- CTA tone: ${safeBrandBrain.voice_tone.cta_tone}
+- Preferred phrases: ${safeBrandBrain.voice_tone.preferred_phrases.slice(0, 10).join(", ")}
+- Avoid phrases: ${[...safeBrandBrain.voice_tone.phrases_to_avoid, ...safeBrandBrain.forbidden_ai_phrases].slice(0, 18).join(", ")}
+- Punctuation rule: Avoid em dashes completely.
+- Primary audiences: ${audienceNames}
+- Audience pain points: ${audiencePainPoints}
+- Therapy services: ${services}
+- Products: ${products}
+- SEO priorities: ${safeBrandBrain.seo_priorities.slice(0, 12).join(", ")}
+- CTA styles: ${safeBrandBrain.preferred_cta_styles.slice(0, 10).join(", ")}
+- Visual style: ${safeBrandBrain.visual_identity.aesthetic_descriptors.slice(0, 10).join(", ")}
+- Required disclaimers: ${safeBrandBrain.clinical_safety_rules.required_disclaimers.slice(0, 5).join(" | ")}
+- Safety: avoid diagnostic certainty ${safeBrandBrain.clinical_safety_rules.avoid_diagnostic_certainty}; avoid overpromising ${safeBrandBrain.clinical_safety_rules.avoid_overpromising}.
+`;
+}
