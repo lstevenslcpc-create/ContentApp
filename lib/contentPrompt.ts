@@ -2,6 +2,7 @@ import type { ContentAngle } from "./contentAngles";
 import type { FrameworkBrief } from "./psychologyFrameworkEngine";
 import type { ExampleBrief } from "./realLifeExampleEngine";
 import type { TherapistInsightBrief } from "./therapistInsightEngine";
+import type { TherapistObservationBrief } from "./therapistObservationEngine";
 import type { BrandBrain, BusinessProfile, ContentGenerationRequest, ContentIntelligenceBrief } from "./types";
 import { formatBrandBrainForPrompt } from "./brandBrain/format";
 import { formatContentGoalForPrompt } from "./contentGoalConfig";
@@ -46,6 +47,14 @@ Content Research + Depth Brief:
 - Body signs: ${(brief.bodySigns || []).join(" | ") || "Use the assigned example brief."}
 - What this can look like: ${(brief.whatThisCanLookLike || []).join(" | ") || "Use the assigned example brief."}
 - Therapist insight: ${brief.therapistInsight || "Use the assigned therapist insight brief."}
+- Therapist observation: ${brief.therapistObservation?.whatISeeInTherapy || "Use the assigned therapist observation brief."}
+- Common assumption to correct: ${brief.therapistObservation?.commonMisunderstanding || "Use the assigned therapist observation brief."}
+- Hidden emotion underneath behavior: ${brief.therapistObservation?.hiddenEmotionUnderneathBehavior || "Use the assigned therapist observation brief."}
+- Internal belief driving behavior: ${brief.therapistObservation?.internalBeliefDrivingBehavior || "Use the assigned therapist observation brief."}
+- What others usually assume: ${brief.therapistObservation?.whatOthersUsuallyAssume || "Use the assigned therapist observation brief."}
+- What is actually happening psychologically: ${brief.therapistObservation?.whatIsActuallyHappeningPsychologically || "Use the assigned therapist observation brief."}
+- Therapist reframe: ${brief.therapistObservation?.therapistReframe || "Use the assigned therapist observation brief."}
+- Practical everyday example: ${brief.therapistObservation?.practicalEverydayExample || "Use the assigned therapist observation brief."}
 - Common misunderstanding: ${brief.commonMisunderstanding || "Use the assigned therapist insight brief."}
 - What people often miss: ${brief.whatPeopleOftenMiss || "Use the assigned therapist insight brief."}
 - What parents, partners, or clients need to know: ${brief.whatToKnow || "Use the assigned therapist insight brief."}
@@ -135,7 +144,26 @@ Every post must sound therapist-led, emotionally specific, practical, warm, and 
 `;
 }
 
-export function buildContentPrompt(profile: BusinessProfile, request: ContentGenerationRequest, brandBrain?: BrandBrain | null, researchBrief?: ContentIntelligenceBrief | null, plannedAngles: ContentAngle[] = [], frameworkBriefs: FrameworkBrief[] = [], exampleBriefs: ExampleBrief[] = [], therapistInsightBriefs: TherapistInsightBrief[] = []) {
+function formatTherapistObservationBriefsForPrompt(observationBriefs: TherapistObservationBrief[] = []) {
+  if (!observationBriefs.length) return "";
+  return `
+Required Therapist Observation Briefs:
+${observationBriefs.map((brief, index) => `Post ${index + 1}:
+- What I see in therapy: ${brief.whatISeeInTherapy}
+- Common misunderstanding: ${brief.commonMisunderstanding}
+- Hidden emotion underneath behavior: ${brief.hiddenEmotionUnderneathBehavior}
+- Internal belief driving behavior: ${brief.internalBeliefDrivingBehavior}
+- What parents, partners, friends, or others usually assume: ${brief.whatOthersUsuallyAssume}
+- What is actually happening psychologically: ${brief.whatIsActuallyHappeningPsychologically}
+- Therapist reframe: ${brief.therapistReframe}
+- Practical example from everyday life: ${brief.practicalEverydayExample}
+- Preferred observation lead-in: ${brief.observationLeadIn}`).join("\n")}
+
+Every post must include at least one authentic therapist observation from its assigned observation brief. Prefer phrases like "What I see in therapy...", "Many people assume...", "What is actually happening...", or "One thing people rarely realize...".
+`;
+}
+
+export function buildContentPrompt(profile: BusinessProfile, request: ContentGenerationRequest, brandBrain?: BrandBrain | null, researchBrief?: ContentIntelligenceBrief | null, plannedAngles: ContentAngle[] = [], frameworkBriefs: FrameworkBrief[] = [], exampleBriefs: ExampleBrief[] = [], therapistInsightBriefs: TherapistInsightBrief[] = [], therapistObservationBriefs: TherapistObservationBrief[] = []) {
   return `
 You are an expert small-business content strategist. Generate ${request.numberOfPosts} ready-to-review ${request.contentType} idea(s) for ${request.platform}.
 
@@ -159,6 +187,7 @@ ${formatPlannedAnglesForPrompt(plannedAngles)}
 ${formatFrameworkBriefsForPrompt(frameworkBriefs)}
 ${formatExampleBriefsForPrompt(exampleBriefs)}
 ${formatTherapistInsightBriefsForPrompt(therapistInsightBriefs)}
+${formatTherapistObservationBriefsForPrompt(therapistObservationBriefs)}
 
 ${request.intelligenceBrief ? `
 Saved Content Opportunity Brief:
@@ -214,6 +243,10 @@ Content rules:
 - Every post must include at least one concrete real-life example, behavior, body sign, thought, phrase, or daily-life moment from the assigned example brief unless the selected content type truly cannot support examples.
 - Prefer examples like irritability after school, stomach aches before class, avoiding homework, saying "I am fine", shutting down when asked questions, perfectionism around grades, rereading texts, checking tone changes, or overexplaining after conflict.
 - Use the assigned therapist insight to avoid broad or promotional language. The post should sound like a licensed therapist naming what is happening underneath, not like AI summarizing symptoms.
+- Every post must include at least one therapist observation. This can be a direct line such as "What I see in therapy...", "Many people assume...", "What is actually happening...", or "One thing people rarely realize...".
+- The therapist observation must reveal something underneath the behavior: the hidden emotion, internal belief, common assumption, actual psychological process, or everyday example.
+- Outputs should feel like a therapist revealing something the audience has not considered before.
+- Avoid generic encouragement, "you are not alone", "mental health matters", and vague "seek support" language.
 - Do not use the assigned "what not to say" language except to explain that it is unhelpful. Prefer "what to try instead" scripts when a practical phrase fits.
 - Avoid promotional language unless the goal is leads, therapy-inquiries, product-sales, promotion, or email-list-growth.
 - Avoid generic AI phrases including "unlock your potential", "healing journey", "just breathe", "you are enough", "mental health matters", "discover practical tools", and "nurture secure relationships".
@@ -238,6 +271,16 @@ Return strict JSON only with this shape:
       "bodySigns": ["Specific body signs used in this post"],
       "whatThisCanLookLike": ["Concrete daily-life examples used in this post"],
       "therapistInsight": "Therapist observation used in this post",
+      "therapistObservation": {
+        "whatISeeInTherapy": "The exact therapist observation included or clearly used",
+        "commonMisunderstanding": "What people usually misunderstand",
+        "hiddenEmotionUnderneathBehavior": "The hidden emotion underneath the behavior",
+        "internalBeliefDrivingBehavior": "The belief driving the behavior",
+        "whatOthersUsuallyAssume": "What parents, partners, friends, or others usually assume",
+        "whatIsActuallyHappeningPsychologically": "What is actually happening psychologically",
+        "therapistReframe": "Therapist reframe",
+        "practicalEverydayExample": "Everyday example"
+      },
       "commonMisunderstanding": "Misunderstanding this post corrects",
       "whatPeopleOftenMiss": "Subtle point people often miss",
       "whatToKnow": "What parents, partners, or clients need to know",
@@ -255,6 +298,8 @@ Return strict JSON only with this shape:
         "framework_explanation": "How the framework teaches the post",
         "practical_application": "The practical application included",
         "therapist_insight": "The therapist insight used",
+        "therapist_observation": "The therapist observation used",
+        "therapist_reframe": "The therapist reframe used",
         "real_life_example_used": "The specific real-life example used",
         "quality_checklist": {
           "hookSpecific": true,

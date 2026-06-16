@@ -161,6 +161,17 @@ export type ContentIntelligenceBrief = {
   whatToTryInstead?: string[];
   clinicalNuance?: string;
   LionHeartStyleNote?: string;
+  therapistObservation?: {
+    whatISeeInTherapy: string;
+    commonMisunderstanding: string;
+    hiddenEmotionUnderneathBehavior: string;
+    internalBeliefDrivingBehavior: string;
+    whatOthersUsuallyAssume: string;
+    whatIsActuallyHappeningPsychologically: string;
+    therapistReframe: string;
+    practicalEverydayExample: string;
+    observationLeadIn: string;
+  };
   topic_definition: string;
   psychological_explanation: string;
   common_symptoms: string[];
@@ -191,6 +202,8 @@ export type ContentWhyThisWorks = {
   framework_explanation?: string;
   practical_application?: string;
   therapist_insight?: string;
+  therapist_observation?: string;
+  therapist_reframe?: string;
   real_life_example_used?: string;
   quality_checklist?: ContentQualityChecklist;
   revision_history?: Array<Record<string, unknown>>;

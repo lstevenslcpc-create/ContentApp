@@ -4,6 +4,7 @@ import { getRelevantExamples } from "./realLifeExamples";
 import { getTherapistInsights } from "./therapistInsights";
 import { getRelevantPsychologyConcepts } from "./psychologyConcepts";
 import { getTopicIntelligence } from "./topicIntelligence";
+import { buildTherapistObservationBrief } from "./therapistObservationEngine";
 
 type BriefInput = {
   request: ContentGenerationRequest;
@@ -172,6 +173,7 @@ export async function buildContentIntelligenceBrief(input: BriefInput) {
   const topicIntelligence = getTopicIntelligence(topic);
   const examples = getRelevantExamples(topic);
   const therapistInsights = getTherapistInsights(topic);
+  const therapistObservation = buildTherapistObservationBrief(topic, String(input.request.contentType || ""), String(input.request.contentGoal || "education"));
   const psychologyConcepts = getRelevantPsychologyConcepts(topic);
   const sourceNotes = await getOptionalResearchNotes(String(input.request.topic || ""));
   const conceptSummary = psychologyConcepts.map((concept) => `${concept.name}: ${concept.simpleExplanation}`);
@@ -191,7 +193,16 @@ export async function buildContentIntelligenceBrief(input: BriefInput) {
     behavioral_patterns: unique([...brief.behavioral_patterns, ...(topicIntelligence?.behaviors || []), ...(topicIntelligence?.relationshipPatterns || [])]),
     nervous_system_signs: unique([...brief.nervous_system_signs, ...(topicIntelligence?.coreSymptoms || []).filter((item) => /body|stomach|head|sleep|panic|sick|heart|tight|numb|freeze/i.test(item))]),
     common_myths: unique([...brief.common_myths, ...(topicIntelligence?.parentMisunderstandings || []), ...(therapistInsights?.commonMisconceptions || [])]),
-    therapist_insight: unique([brief.therapist_insight, ...(therapistInsights?.commonTherapistObservations || []), ...(therapistInsights?.whatTherapistsWishPeopleUnderstood || [])]).join(" "),
+    therapist_insight: unique([
+      brief.therapist_insight,
+      therapistObservation.whatISeeInTherapy,
+      therapistObservation.commonMisunderstanding,
+      therapistObservation.whatIsActuallyHappeningPsychologically,
+      therapistObservation.therapistReframe,
+      ...(therapistInsights?.commonTherapistObservations || []),
+      ...(therapistInsights?.whatTherapistsWishPeopleUnderstood || [])
+    ]).join(" "),
+    therapistObservation,
     psychological_explanation: unique([brief.psychological_explanation, ...conceptSummary]).join(" "),
     observer_notes: unique([brief.observer_notes, ...(therapistInsights?.patternsSeenInPractice || [])]).join(" "),
     source_notes: sourceNotes
