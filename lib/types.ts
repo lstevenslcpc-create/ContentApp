@@ -205,6 +205,20 @@ export type ContentWhyThisWorks = {
   therapist_observation?: string;
   therapist_reframe?: string;
   real_life_example_used?: string;
+  lionheart_voice_check?: {
+    score: number;
+    specificity: number;
+    emotionalResonance: number;
+    therapistInsight: number;
+    realLifeExample: number;
+    socialNativeReadability: number;
+    brandFit: number;
+    ctaFit: number;
+    genericLanguageRisk: number;
+    strengths: string[];
+    improvements: string[];
+    genericPhraseWarnings: string[];
+  };
   quality_checklist?: ContentQualityChecklist;
   revision_history?: Array<Record<string, unknown>>;
   last_revision_action?: string;

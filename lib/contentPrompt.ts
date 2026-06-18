@@ -6,6 +6,7 @@ import type { TherapistObservationBrief } from "./therapistObservationEngine";
 import type { BrandBrain, BusinessProfile, ContentGenerationRequest, ContentIntelligenceBrief } from "./types";
 import { formatCompactBrandBrainForPrompt } from "./brandBrain/format";
 import { formatContentGoalForPrompt } from "./contentGoalConfig";
+import { applyLionHeartVoiceGuidance } from "./lionheartVoiceLibrary";
 
 function followerGrowthInstructions(request: ContentGenerationRequest) {
   if (request.contentGoal !== "follower-growth") return "";
@@ -188,6 +189,13 @@ ${formatFrameworkBriefsForPrompt(frameworkBriefs)}
 ${formatExampleBriefsForPrompt(exampleBriefs)}
 ${formatTherapistInsightBriefsForPrompt(therapistInsightBriefs)}
 ${formatTherapistObservationBriefsForPrompt(therapistObservationBriefs)}
+${applyLionHeartVoiceGuidance({
+  topic: request.topic,
+  goal: request.contentGoal,
+  platform: request.platform,
+  contentType: request.contentType,
+  audience: profile.target_audience
+})}
 
 ${request.intelligenceBrief ? `
 Saved Content Opportunity Brief:

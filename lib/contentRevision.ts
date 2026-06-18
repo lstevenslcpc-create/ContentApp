@@ -1,5 +1,6 @@
 import type { BrandBrain, ContentPack, ContentPackSectionKey, GeneratedContent } from "./types";
-import { formatBrandBrainForPrompt } from "./brandBrain/format";
+import { formatCompactBrandBrainForPrompt } from "./brandBrain/format";
+import { applyLionHeartVoiceGuidance } from "./lionheartVoiceLibrary";
 
 export type ContentImproveAction =
   | "regenerate_hook"
@@ -179,7 +180,14 @@ Targeted edit action:
 ${actionInstruction(action)}
 
 Brand Brain summary:
-${formatBrandBrainForPrompt(brandBrain)}
+${formatCompactBrandBrainForPrompt(brandBrain)}
+
+${applyLionHeartVoiceGuidance({
+  topic: item.topic,
+  goal: item.content_goal,
+  platform: item.platform,
+  contentType: item.content_type
+})}
 
 Current content:
 ${JSON.stringify(current, null, 2)}
@@ -256,7 +264,15 @@ Targeted content pack edit:
 ${actionInstruction(action)}
 
 Brand Brain summary:
-${formatBrandBrainForPrompt(brandBrain)}
+${formatCompactBrandBrainForPrompt(brandBrain)}
+
+${applyLionHeartVoiceGuidance({
+  topic: pack.source_topic || pack.title,
+  goal: pack.content_pillar,
+  platform: sectionKey,
+  contentType: "content pack section",
+  audience: pack.audience
+})}
 
 Content pack context:
 ${JSON.stringify({
@@ -290,7 +306,15 @@ Targeted Canva slide edit:
 ${slideInstruction(action)}
 
 Brand Brain summary:
-${formatBrandBrainForPrompt(brandBrain)}
+${formatCompactBrandBrainForPrompt(brandBrain)}
+
+${applyLionHeartVoiceGuidance({
+  topic: pack.source_topic || pack.title,
+  goal: pack.content_pillar,
+  platform: "Canva",
+  contentType: String(pack.metadata?.selectedCanvaTemplateName || "Canva slide"),
+  audience: pack.audience
+})}
 
 Slide context:
 ${JSON.stringify({

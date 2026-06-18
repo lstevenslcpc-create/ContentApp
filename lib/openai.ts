@@ -8,6 +8,7 @@ import { buildFrameworkBrief } from "./psychologyFrameworkEngine";
 import { buildExampleBrief } from "./realLifeExampleEngine";
 import { buildTherapistInsightBrief } from "./therapistInsightEngine";
 import { buildTherapistObservationBrief } from "./therapistObservationEngine";
+import { applyLionHeartVoiceGuidance, scoreLionHeartVoice } from "./lionheartVoiceLibrary";
 
 type GeneratedPost = {
   hook: string;
@@ -785,6 +786,10 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
       ...repairedPost,
       why_this_works: {
         ...repairedPost.why_this_works,
+        lionheart_voice_check: scoreLionHeartVoice(
+          [repairedPost.hook, repairedPost.caption, repairedPost.script, repairedPost.visual_idea].filter(Boolean).join("\n\n"),
+          { topic: request.topic, goal: request.contentGoal, platform: request.platform, contentType: request.contentType, audience: profile.target_audience }
+        ),
         quality_checklist: checklist
       }
     };
@@ -836,6 +841,14 @@ ${focusInstruction}
 
 Brand Brain:
 ${formatBrandBrainForPrompt(brandBrain)}
+
+${applyLionHeartVoiceGuidance({
+  topic: opportunity.topic,
+  goal: opportunity.content_pillar,
+  platform: "multi-platform content pack",
+  contentType: "content pack",
+  audience: opportunity.audience
+})}
 
 Content opportunity:
 ${JSON.stringify(opportunity, null, 2)}

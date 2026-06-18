@@ -199,6 +199,41 @@ export function ContentCard({ item, onUpdate, onRemove }: { item: GeneratedConte
               </div>
             )}
           </dl>
+          {whyThisWorks.lionheart_voice_check && (
+            <details className="mt-4 rounded-xl border border-[#d8c28a] bg-white p-4">
+              <summary className="cursor-pointer text-sm font-bold text-[#4d3a7a]">LionHeart Voice Check</summary>
+              <div className="mt-4 grid gap-4">
+                <div className="flex items-center justify-between rounded-xl bg-[#eee8fb] px-4 py-3">
+                  <span className="text-xs font-bold uppercase tracking-wide text-[#6f4ca0]">Voice score</span>
+                  <strong className="text-2xl text-[#4d3a7a]">{whyThisWorks.lionheart_voice_check.score}/100</strong>
+                </div>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide text-[#4f6f5a]">What made it sound on-brand</p>
+                  <ul className="mt-2 space-y-1 text-sm leading-6 text-[#20313f]">
+                    {whyThisWorks.lionheart_voice_check.strengths.length
+                      ? whyThisWorks.lionheart_voice_check.strengths.map((strength) => <li key={strength}>• {strength}</li>)
+                      : <li>• The draft follows the saved LionHeart voice guidance.</li>}
+                  </ul>
+                </div>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide text-[#8a6926]">What could be improved</p>
+                  <ul className="mt-2 space-y-1 text-sm leading-6 text-[#20313f]">
+                    {whyThisWorks.lionheart_voice_check.improvements.length
+                      ? whyThisWorks.lionheart_voice_check.improvements.map((improvement) => <li key={improvement}>• {improvement}</li>)
+                      : <li>• No major voice improvements flagged.</li>}
+                  </ul>
+                </div>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide text-[#a94b4b]">Generic phrase warnings</p>
+                  <p className="mt-2 text-sm leading-6 text-[#20313f]">
+                    {whyThisWorks.lionheart_voice_check.genericPhraseWarnings.length
+                      ? whyThisWorks.lionheart_voice_check.genericPhraseWarnings.join(", ")
+                      : "No forbidden or overused phrases detected."}
+                  </p>
+                </div>
+              </div>
+            </details>
+          )}
         </details>
       )}
       {item.media_url && (
