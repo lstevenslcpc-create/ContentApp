@@ -339,7 +339,9 @@ export function CanvaTemplatesClient() {
                     Test Template Link
                   </button>
                   <button className="btn-secondary" onClick={() => edit(template)}><Pencil size={16} />Edit</button>
-                  <button className="btn-primary bg-[#172a3a] hover:bg-[#22384a]" onClick={() => setStatus(template, "approved")} disabled={busy === template.id}><CheckCircle2 size={16} />Approve</button>
+                  {template.approval_status !== "approved" && (
+                    <button className="btn-primary bg-[#172a3a] hover:bg-[#22384a]" onClick={() => setStatus(template, "approved")} disabled={busy === template.id}><CheckCircle2 size={16} />Approve</button>
+                  )}
                   <button className="btn-secondary" onClick={() => setStatus(template, "archived")} disabled={busy === template.id}><Archive size={16} />Archive</button>
                 </div>
                 {linkMessages[template.id] && <p className="mt-3 rounded-xl bg-[#f7f1e6] p-3 text-xs font-bold text-[#77633c]">{linkMessages[template.id]}</p>}
