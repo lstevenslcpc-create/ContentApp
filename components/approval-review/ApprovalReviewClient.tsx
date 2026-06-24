@@ -731,7 +731,7 @@ export function ApprovalReviewClient() {
           )) : (
             <div className="rounded-3xl border border-dashed border-[#d8c28a] bg-white p-8 text-center">
               <p className="text-lg font-bold text-[#172a3a]">No content packs match these filters.</p>
-              <p className="mt-2 text-sm text-[#6f766f]">Create a Content Pack from Content Intelligence, then review it here before Canva or scheduling.</p>
+              <p className="mt-2 text-sm text-[#6f766f]">Only Content Packs appear here. Generate content or choose a Content Intelligence idea, then create a pack first.</p>
             </div>
           )}
         </div>

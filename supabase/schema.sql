@@ -59,7 +59,7 @@ create table if not exists generated_content (
   hashtags text[] default '{}',
   visual_idea text,
   script text,
-  status text default 'needs_review',
+  status text default 'draft',
   scheduled_for timestamptz,
   posted_at timestamptz,
   media_url text,
@@ -68,6 +68,8 @@ create table if not exists generated_content (
   media_status text,
   canva_design_url text,
   canva_template_id text,
+  converted_at timestamptz,
+  is_generation_history boolean default true,
   archived boolean default false,
   content_intelligence_brief jsonb default '{}'::jsonb,
   why_this_works jsonb default '{}'::jsonb,
@@ -302,10 +304,16 @@ alter table brand_brains add column if not exists preferred_platforms text[] def
 alter table brand_brains add column if not exists content_goals text[] default '{}';
 alter table brand_brains add column if not exists conversion_priorities text[] default '{}';
 alter table generated_content add column if not exists user_id uuid references auth.users(id) on delete cascade;
+alter table generated_content alter column status set default 'draft';
 alter table generated_content add column if not exists topic text;
 alter table generated_content add column if not exists content_angle text;
 alter table generated_content add column if not exists canva_design_url text;
 alter table generated_content add column if not exists canva_template_id text;
+alter table generated_content add column if not exists content_pack_id uuid references content_packs(id) on delete set null;
+alter table generated_content add column if not exists converted_at timestamptz;
+alter table generated_content add column if not exists is_generation_history boolean default true;
+create index if not exists generated_content_content_pack_id_idx
+on generated_content(content_pack_id);
 alter table generated_content add column if not exists archived boolean default false;
 alter table generated_content add column if not exists content_intelligence_brief jsonb default '{}'::jsonb;
 alter table generated_content add column if not exists why_this_works jsonb default '{}'::jsonb;

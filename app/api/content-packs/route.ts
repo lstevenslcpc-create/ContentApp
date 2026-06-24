@@ -108,13 +108,13 @@ function generatedContentPackBody(item: GeneratedContent) {
   };
 }
 
-function generatedContentPackRow(userId: string, item: GeneratedContent) {
+function generatedContentPackRow(userId: string, item: GeneratedContent, status: "draft" | "needs_review" = "needs_review") {
   const title = titleFromGeneratedContent(item);
   return {
     user_id: userId,
     opportunity_id: null,
     title,
-    status: "needs_review",
+    status,
     source_topic: item.topic || title,
     audience: null,
     content_pillar: item.content_goal || null,
@@ -137,7 +137,43 @@ function generatedContentPackRow(userId: string, item: GeneratedContent) {
   };
 }
 
-async function createPackFromGeneratedContent(userId: string, generatedContentId: string) {
+async function linkGeneratedContentToPack(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  userId: string,
+  generatedContentId: string,
+  contentPackId: string,
+  markApproved: boolean
+) {
+  const updatePayload = {
+    content_pack_id: contentPackId,
+    converted_at: new Date().toISOString(),
+    is_generation_history: true,
+    status: markApproved ? "approved" : "draft"
+  };
+  const { error } = await supabase
+    .from("generated_content")
+    .update(updatePayload)
+    .eq("user_id", userId)
+    .eq("id", generatedContentId);
+
+  if (!error) return { warning: "" };
+
+  if (/(content_pack_id|converted_at|is_generation_history|schema cache)/i.test(error.message || "")) {
+    const fallback = await supabase
+      .from("generated_content")
+      .update({ status: markApproved ? "approved" : "draft" })
+      .eq("user_id", userId)
+      .eq("id", generatedContentId);
+    if (fallback.error) throw new Error(`Content pack was created but generated draft linking failed: ${fallback.error.message}`);
+    return {
+      warning: `Content pack was created, but Supabase is missing the latest generated_content linking columns: ${error.message}`
+    };
+  }
+
+  throw new Error(`Content pack was created but generated draft linking failed: ${error.message}`);
+}
+
+async function createPackFromGeneratedContent(userId: string, generatedContentId: string, targetStatus: "draft" | "needs_review") {
   const supabase = getSupabaseAdmin();
   const { data: item, error: itemError } = await supabase
     .from("generated_content")
@@ -148,10 +184,11 @@ async function createPackFromGeneratedContent(userId: string, generatedContentId
 
   if (itemError) throw new Error(`Unable to load generated content: ${itemError.message}`);
   const generatedContent = item as GeneratedContent;
+  const requestedStatus = targetStatus;
 
   const brandBrain = await loadBrandBrain(userId);
   const risk = scanContentRisk(generatedContent, brandBrain);
-  if (!risk.passed) {
+  if (requestedStatus === "needs_review" && !risk.passed) {
     return NextResponse.json(
       {
         ok: false,
@@ -160,6 +197,32 @@ async function createPackFromGeneratedContent(userId: string, generatedContentId
       },
       { status: 400 }
     );
+  }
+
+  if (generatedContent.content_pack_id) {
+    const { data: linkedPack, error: linkedError } = await supabase
+      .from("content_packs")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("id", generatedContent.content_pack_id)
+      .maybeSingle();
+
+    if (linkedError) throw new Error(`Unable to load linked content pack: ${linkedError.message}`);
+    if (linkedPack) {
+      const linked = await linkGeneratedContentToPack(supabase, userId, generatedContentId, linkedPack.id, requestedStatus === "needs_review");
+      if (linkedPack.status !== requestedStatus) {
+        const { data: updatedLinked, error: updateLinkedError } = await supabase
+          .from("content_packs")
+          .update({ status: requestedStatus })
+          .eq("user_id", userId)
+          .eq("id", linkedPack.id)
+          .select("*")
+          .single();
+        if (updateLinkedError) throw new Error(`Unable to update linked content pack status: ${updateLinkedError.message}`);
+        return NextResponse.json({ ok: true, pack: updatedLinked, alreadyExists: true, linked: true, warning: linked.warning });
+      }
+      return NextResponse.json({ ok: true, pack: linkedPack, alreadyExists: true, linked: true, warning: linked.warning });
+    }
   }
 
   const { data: existing, error: existingError } = await supabase
@@ -171,24 +234,31 @@ async function createPackFromGeneratedContent(userId: string, generatedContentId
 
   if (existingError) throw new Error(`Unable to check existing content pack: ${existingError.message}`);
 
-  await supabase
-    .from("generated_content")
-    .update({ status: "approved" })
-    .eq("user_id", userId)
-    .eq("id", generatedContentId);
-
   if (existing) {
-    return NextResponse.json({ ok: true, pack: existing, alreadyExists: true });
+    const linked = await linkGeneratedContentToPack(supabase, userId, generatedContentId, existing.id, requestedStatus === "needs_review");
+    if (existing.status !== requestedStatus) {
+      const { data: updatedExisting, error: updateExistingError } = await supabase
+        .from("content_packs")
+        .update({ status: requestedStatus })
+        .eq("user_id", userId)
+        .eq("id", existing.id)
+        .select("*")
+        .single();
+      if (updateExistingError) throw new Error(`Unable to update existing content pack status: ${updateExistingError.message}`);
+      return NextResponse.json({ ok: true, pack: updatedExisting, alreadyExists: true, linked: true, warning: linked.warning });
+    }
+    return NextResponse.json({ ok: true, pack: existing, alreadyExists: true, linked: true, warning: linked.warning });
   }
 
   const { data, error } = await supabase
     .from("content_packs")
-    .insert(generatedContentPackRow(userId, generatedContent))
+    .insert(generatedContentPackRow(userId, generatedContent, requestedStatus))
     .select("*")
     .single();
 
   if (error) throw new Error(`Unable to create Approval Review content pack: ${error.message}`);
-  return NextResponse.json({ ok: true, pack: data });
+  const linked = await linkGeneratedContentToPack(supabase, userId, generatedContentId, data.id, requestedStatus === "needs_review");
+  return NextResponse.json({ ok: true, pack: data, linked: true, warning: linked.warning });
 }
 
 export async function GET(request: Request) {
@@ -218,7 +288,8 @@ export async function POST(request: Request) {
     const body = await request.json();
     const generatedContentId = typeof body.generatedContentId === "string" ? body.generatedContentId : "";
     if (generatedContentId) {
-      return createPackFromGeneratedContent(user.id, generatedContentId);
+      const targetStatus = body.targetStatus === "draft" ? "draft" : "needs_review";
+      return createPackFromGeneratedContent(user.id, generatedContentId, targetStatus);
     }
 
     const opportunityId = typeof body.opportunityId === "string" ? body.opportunityId : undefined;

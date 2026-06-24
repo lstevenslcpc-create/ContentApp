@@ -68,6 +68,13 @@ export async function DELETE(request: Request, context: RouteContext) {
     const id = await paramsId(context);
     const supabase = getSupabaseAdmin();
 
+    const { data: generatedItem } = await supabase
+      .from("generated_content")
+      .select("content_pack_id")
+      .eq("user_id", user.id)
+      .eq("id", id)
+      .maybeSingle();
+
     const { data: relatedPacks, error: relatedError } = await supabase
       .from("content_packs")
       .select("id")
@@ -75,7 +82,11 @@ export async function DELETE(request: Request, context: RouteContext) {
       .contains("metadata", { generatedContentId: id });
 
     if (relatedError) throw relatedError;
-    const relatedPackIds = (relatedPacks || []).map((pack) => pack.id).filter(Boolean);
+    const directPackId = typeof generatedItem?.content_pack_id === "string" ? generatedItem.content_pack_id : "";
+    const relatedPackIds = Array.from(new Set([
+      directPackId,
+      ...(relatedPacks || []).map((pack) => pack.id)
+    ].filter(Boolean)));
 
     if (relatedPackIds.length) {
       const { error: calendarError } = await supabase

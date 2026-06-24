@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Check, ExternalLink, Loader2, RotateCcw, Send, WandSparkles } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { Check, ExternalLink, Loader2, PackagePlus, RotateCcw, Send, WandSparkles } from "lucide-react";
 import { authedFetch } from "@/lib/apiClient";
 import type { GeneratedContent } from "@/lib/types";
 import { CopyButton } from "./CopyButton";
@@ -30,7 +29,7 @@ export function ContentCard({ item, onUpdate, onRemove }: { item: GeneratedConte
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [busyAction, setBusyAction] = useState("");
-  const router = useRouter();
+  const [linkedPackId, setLinkedPackId] = useState(item.content_pack_id || "");
 
   async function setStatus(status: string) {
     setMessage("");
@@ -80,23 +79,34 @@ export function ContentCard({ item, onUpdate, onRemove }: { item: GeneratedConte
     onRemove?.(item.id);
   }
 
-  async function sendToApprovalReview() {
+  async function createOrSendToApprovalReview(targetStatus: "draft" | "needs_review") {
     setMessage("");
     setSending(true);
     const response = await authedFetch("/api/content-packs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ generatedContentId: item.id })
+      body: JSON.stringify({ generatedContentId: item.id, targetStatus })
     });
     const data = await response.json();
     setSending(false);
 
     if (response.ok && data.pack?.id) {
-      router.push("/approval-review");
+      const packId = String(data.pack.id);
+      setLinkedPackId(packId);
+      onUpdate?.({
+        ...item,
+        content_pack_id: packId,
+        converted_at: new Date().toISOString(),
+        is_generation_history: true,
+        status: targetStatus === "needs_review" ? "approved" : "draft"
+      });
+      setMessage(targetStatus === "needs_review"
+        ? "Content pack created and sent to Approval Review."
+        : "Content pack created as a draft production item.");
       return;
     }
 
-    setMessage([data.error || "Unable to send this content to Approval Review.", Array.isArray(data.issues) ? data.issues.join(" ") : ""].filter(Boolean).join(" "));
+    setMessage([data.error || "Unable to create a Content Pack from this generated draft.", Array.isArray(data.issues) ? data.issues.join(" ") : ""].filter(Boolean).join(" "));
   }
 
   async function improveContent(action: string) {
@@ -119,15 +129,17 @@ export function ContentCard({ item, onUpdate, onRemove }: { item: GeneratedConte
 
   const whyThisWorks = item.why_this_works;
   const revisionCount = Array.isArray(whyThisWorks?.revision_history) ? whyThisWorks.revision_history.length : 0;
+  const productionPackId = linkedPackId || item.content_pack_id || "";
 
   return (
     <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-brand">{item.platform} · {item.content_type}</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-brand">Generation Draft / History · {item.platform} · {item.content_type}</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {item.topic && <p className="inline-flex rounded-full bg-[#f7f1e6] px-3 py-1 text-xs font-bold text-[#77633c]">Topic: {item.topic}</p>}
             {item.content_angle && <p className="inline-flex rounded-full bg-[#ede7f6] px-3 py-1 text-xs font-bold text-[#6f4ca0]">Angle: {item.content_angle}</p>}
+            {productionPackId && <p className="inline-flex rounded-full bg-[#eef3ec] px-3 py-1 text-xs font-bold text-[#4f6f5a]">Sent to Approval Review</p>}
           </div>
           <h3 className="mt-2 text-lg font-bold text-ink">{item.hook || "Untitled content"}</h3>
         </div>
@@ -272,10 +284,29 @@ export function ContentCard({ item, onUpdate, onRemove }: { item: GeneratedConte
       </details>
 
       <div className="mt-5 flex flex-wrap gap-2">
-        <button className="btn-primary" onClick={sendToApprovalReview} disabled={sending}>
-          {sending ? <Check size={16} /> : <Send size={16} />}
-          {sending ? "Sending..." : "Approve + Send to Review"}
-        </button>
+        {productionPackId ? (
+          <>
+            <Link className="btn-primary bg-[#172a3a] hover:bg-[#22384a]" href={`/content-packs/${productionPackId}`}>
+              <ExternalLink size={16} />
+              Open Content Pack
+            </Link>
+            <Link className="btn-secondary" href="/approval-review">
+              <ExternalLink size={16} />
+              Open in Approval Review
+            </Link>
+          </>
+        ) : (
+          <>
+            <button className="btn-secondary" onClick={() => void createOrSendToApprovalReview("draft")} disabled={sending}>
+              {sending ? <Loader2 className="animate-spin" size={16} /> : <PackagePlus size={16} />}
+              Create Content Pack
+            </button>
+            <button className="btn-primary" onClick={() => void createOrSendToApprovalReview("needs_review")} disabled={sending}>
+              {sending ? <Check size={16} /> : <Send size={16} />}
+              {sending ? "Sending..." : "Approve + Send to Review"}
+            </button>
+          </>
+        )}
         <ContentLifecycleActions
           archived={Boolean(item.archived)}
           busy={Boolean(busyAction)}
@@ -303,7 +334,17 @@ export function ContentCard({ item, onUpdate, onRemove }: { item: GeneratedConte
         <Link className="btn-secondary" href={`/media-generator?contentId=${item.id}`}>Send to media generator</Link>
         <button className="btn-secondary" onClick={() => setStatus("posted")}>Mark posted</button>
       </div>
-      {message && <p className="mt-4 rounded-lg bg-amber-50 p-3 text-sm font-semibold text-amber-800">{message}</p>}
+      {message && (
+        <div className="mt-4 rounded-lg bg-amber-50 p-3 text-sm font-semibold text-amber-800">
+          <p>{message}</p>
+          {productionPackId && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Link className="btn-secondary bg-white" href="/approval-review">Open in Approval Review</Link>
+              <Link className="btn-secondary bg-white" href={`/content-packs/${productionPackId}`}>Open Content Pack</Link>
+            </div>
+          )}
+        </div>
+      )}
 
       <p className="mt-4 text-xs text-slate-500">
         Manual posting: review the caption, copy it with hashtags, create or attach the visual in Canva or the AI Media Generator, then post in the social app. Auto-posting is disabled in MVP.

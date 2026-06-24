@@ -98,6 +98,10 @@ export function ContentGeneratorForm() {
         </div>
       </form>
       <div className="space-y-4">
+        <div className="rounded-xl border border-[#e7ddca] bg-[#fffdf8] p-4 text-sm leading-6 text-[#6f766f]">
+          <p className="font-bold text-[#172a3a]">Generated drafts become production items when you create a Content Pack.</p>
+          <p className="mt-1">Use this page for generation history and first-pass drafts. Approval Review, Canva Prep, Calendar, and Ready to Post all work from Content Packs.</p>
+        </div>
         {posts.length ? (
           <div className="flex justify-end">
             <label className="flex items-center gap-2 text-sm font-bold text-slate-600">
@@ -113,7 +117,7 @@ export function ContentGeneratorForm() {
             onUpdate={(updated) => setPosts((current) => current.map((item) => item.id === updated.id ? updated : item))}
             onRemove={(id) => setPosts((current) => current.filter((item) => item.id !== id))}
           />
-        )) : <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-500">Generated posts will appear here for review, approval, copying, scheduling, and manual posting.</div>}
+        )) : <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-500">Generated drafts will appear here. Create a Content Pack when a draft is ready to become a production item for Approval Review, Canva Prep, Calendar, and Ready to Post.</div>}
       </div>
     </div>
   );

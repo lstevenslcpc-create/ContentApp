@@ -135,6 +135,9 @@ export type GeneratedContent = {
   media_status?: MediaStatus | null;
   canva_design_url?: string | null;
   canva_template_id?: string | null;
+  content_pack_id?: string | null;
+  converted_at?: string | null;
+  is_generation_history?: boolean | null;
   archived?: boolean | null;
   content_intelligence_brief?: ContentIntelligenceBrief | null;
   why_this_works?: ContentWhyThisWorks | null;

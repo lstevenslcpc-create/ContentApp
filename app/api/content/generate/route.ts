@@ -80,7 +80,7 @@ async function generateAndSaveBatch({
     script: post.script || null,
     content_intelligence_brief: post.content_intelligence_brief || null,
     why_this_works: post.why_this_works || null,
-    status: "needs_review",
+    status: "draft",
     media_status: "not_started"
   }));
 
