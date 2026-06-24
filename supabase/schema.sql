@@ -152,6 +152,10 @@ create table if not exists content_packs (
   clinical_sensitivity text,
   design_status text default 'not_started',
   canva_template_id uuid,
+  canva_design_id text,
+  canva_design_url text,
+  canva_autofill_enabled boolean default false,
+  placeholder_mapping jsonb default '{}'::jsonb,
   pack jsonb default '{}'::jsonb,
   canva_brief jsonb default '{}'::jsonb,
   metadata jsonb default '{}'::jsonb,
@@ -165,17 +169,27 @@ create table if not exists content_packs (
 create table if not exists canva_templates (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
+  canva_template_id text,
   template_name text not null,
   canva_template_link text not null,
+  content_type text,
   format_type text not null,
   dimensions text,
+  platform_size text,
+  number_of_slides integer,
   aesthetic_vibe text,
+  visual_style_notes text,
   color_palette text,
   font_style text,
   graphic_style text,
   best_use_case text,
   audience_fit text,
   content_pillar_fit text,
+  slide_structure_rules jsonb default '{}'::jsonb,
+  canva_design_id text,
+  canva_design_url text,
+  canva_autofill_enabled boolean default false,
+  placeholder_mapping jsonb default '{}'::jsonb,
   recommended_for text[] default '{}',
   approval_status text default 'draft',
   notes text,
@@ -189,6 +203,12 @@ on canva_templates(user_id, approval_status);
 
 create index if not exists canva_templates_format_type_idx
 on canva_templates(format_type);
+
+create index if not exists canva_templates_content_type_idx
+on canva_templates(content_type);
+
+create index if not exists canva_templates_canva_template_id_idx
+on canva_templates(canva_template_id);
 
 create table if not exists content_calendar_plans (
   id uuid primary key default gen_random_uuid(),
@@ -347,21 +367,35 @@ alter table content_packs add column if not exists service_tie_in text;
 alter table content_packs add column if not exists clinical_sensitivity text;
 alter table content_packs add column if not exists design_status text default 'not_started';
 alter table content_packs add column if not exists canva_template_id uuid;
+alter table content_packs add column if not exists canva_design_id text;
+alter table content_packs add column if not exists canva_design_url text;
+alter table content_packs add column if not exists canva_autofill_enabled boolean default false;
+alter table content_packs add column if not exists placeholder_mapping jsonb default '{}'::jsonb;
 alter table content_packs add column if not exists pack jsonb default '{}'::jsonb;
 alter table content_packs add column if not exists canva_brief jsonb default '{}'::jsonb;
 alter table content_packs add column if not exists metadata jsonb default '{}'::jsonb;
 alter table canva_templates add column if not exists user_id uuid references auth.users(id) on delete cascade;
+alter table canva_templates add column if not exists canva_template_id text;
 alter table canva_templates add column if not exists template_name text;
 alter table canva_templates add column if not exists canva_template_link text;
+alter table canva_templates add column if not exists content_type text;
 alter table canva_templates add column if not exists format_type text;
 alter table canva_templates add column if not exists dimensions text;
+alter table canva_templates add column if not exists platform_size text;
+alter table canva_templates add column if not exists number_of_slides integer;
 alter table canva_templates add column if not exists aesthetic_vibe text;
+alter table canva_templates add column if not exists visual_style_notes text;
 alter table canva_templates add column if not exists color_palette text;
 alter table canva_templates add column if not exists font_style text;
 alter table canva_templates add column if not exists graphic_style text;
 alter table canva_templates add column if not exists best_use_case text;
 alter table canva_templates add column if not exists audience_fit text;
 alter table canva_templates add column if not exists content_pillar_fit text;
+alter table canva_templates add column if not exists slide_structure_rules jsonb default '{}'::jsonb;
+alter table canva_templates add column if not exists canva_design_id text;
+alter table canva_templates add column if not exists canva_design_url text;
+alter table canva_templates add column if not exists canva_autofill_enabled boolean default false;
+alter table canva_templates add column if not exists placeholder_mapping jsonb default '{}'::jsonb;
 alter table canva_templates add column if not exists recommended_for text[] default '{}';
 alter table canva_templates add column if not exists approval_status text default 'draft';
 alter table canva_templates add column if not exists notes text;

@@ -711,7 +711,7 @@ export function ApprovalReviewClient() {
               onNeedsReview={() => patchPack(pack.id, { status: "needs_review" }, "Content pack marked needs review.")}
               onCanva={() => {
                 const match = bestTemplateMatch(pack, templates);
-                patchPack(pack.id, { canvaTemplateId: match?.template.id || selectedTemplate?.id || null, metadata: metadataWithCanva(pack, "ready_for_canva", match?.template || selectedTemplate, match) }, "Content pack sent to Canva Prep with Canva template match saved.");
+                patchPack(pack.id, { canvaTemplateId: match?.template.id || selectedTemplate?.id || null, metadata: metadataWithCanva(pack, "ready_for_canva", match?.template || selectedTemplate, match) }, "Canva copy prepared with template match saved.");
               }}
               onDesignStarted={() => {
                 const match = bestTemplateMatch(pack, templates);
@@ -739,6 +739,7 @@ export function ApprovalReviewClient() {
         <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
           {selected && brief ? (
             <section className="rounded-3xl border border-[#e9dfcf] bg-white p-5 shadow-sm">
+              <CanvaIntegrationStatusPanel />
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="inline-flex items-center gap-2 rounded-full bg-[#eee8fb] px-3 py-1 text-xs font-bold text-[#4d3a7a]"><Palette size={14} /> Canva Prep</p>
@@ -776,6 +777,7 @@ export function ApprovalReviewClient() {
                 {selectedTemplate?.canva_template_link && <a className="btn-secondary" href={selectedTemplate.canva_template_link} target="_blank" rel="noreferrer"><ExternalLink size={16} />Open Canva Template</a>}
               </div>
 
+              <ManualCanvaWorkflowChecklist />
               <CanvaSlideCopyCenter
                 fields={templatePreview}
                 busy={busy.startsWith(`${selected.id}:improve`)}
@@ -888,7 +890,7 @@ function PackReviewCard({ pack, selected, busy, onSelect, onApprove, onDraft, on
         <button className="btn-primary bg-[#172a3a] hover:bg-[#22384a]" onClick={onApprove} disabled={busy}><CheckCircle2 size={16} />Approve</button>
         <button className="btn-secondary" onClick={onDraft} disabled={busy}><RotateCcw size={16} />Send to Draft</button>
         <button className="btn-secondary" onClick={onNeedsReview} disabled={busy}><Sparkles size={16} />Needs Review</button>
-        <button className="btn-secondary" onClick={onCanva} disabled={busy}><Send size={16} />Send to Canva Prep</button>
+        <button className="btn-secondary" onClick={onCanva} disabled={busy}><Send size={16} />Prepare Canva Copy</button>
       </div>
 
       <div className="mt-4 grid gap-2 rounded-2xl bg-[#fffdf8] p-4 ring-1 ring-[#eadfc8] lg:grid-cols-[1fr_auto_auto] lg:items-end">
@@ -908,6 +910,58 @@ function PackReviewCard({ pack, selected, busy, onSelect, onApprove, onDraft, on
         />
       </div>
     </article>
+  );
+}
+
+function CanvaIntegrationStatusPanel() {
+  const items = [
+    ["Canva Prep", true],
+    ["Template links", true],
+    ["AI template matching", true],
+    ["Copy buttons", true],
+    ["Auto-fill text into Canva", false],
+    ["Canva API OAuth", false],
+    ["Auto-created Canva designs", false]
+  ] as const;
+
+  return (
+    <div className="mb-5 rounded-2xl border border-[#eadfc8] bg-[#fffdf8] p-4">
+      <p className="text-xs font-bold uppercase tracking-wide text-[#77633c]">Canva Integration Status</p>
+      <p className="mt-2 text-sm leading-6 text-[#6f766f]">This workflow prepares copy and design guidance for manual Canva use. It does not auto-fill or auto-create Canva designs yet.</p>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        {items.map(([label, active]) => (
+          <div key={label} className="flex items-center justify-between gap-3 rounded-xl bg-white px-3 py-2 ring-1 ring-[#eadfc8]">
+            <span className="text-xs font-bold text-[#172a3a]">{label}</span>
+            <span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase ${active ? "bg-[#eef3ec] text-[#4f6f5a]" : "bg-[#fff7f5] text-[#a94b4b]"}`}>{active ? "Active" : "Not connected yet"}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ManualCanvaWorkflowChecklist() {
+  const steps = [
+    "Open matched Canva template",
+    "Duplicate or use the template",
+    "Copy Slide 1 text",
+    "Paste into Canva",
+    "Repeat for each slide",
+    "Export or schedule manually",
+    "Mark Designed in Canva"
+  ];
+  return (
+    <div className="mt-4 rounded-2xl bg-[#eef3ec] p-4 ring-1 ring-[#cbdcc7]">
+      <p className="text-xs font-bold uppercase tracking-wide text-[#4f6f5a]">Manual Canva Workflow</p>
+      <ol className="mt-3 grid gap-2 text-sm leading-6 text-[#20313f]">
+        {steps.map((step, index) => (
+          <li key={step} className="flex gap-3">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-xs font-bold text-[#4f6f5a]">{index + 1}</span>
+            <span>{step}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
   );
 }
 
@@ -1017,7 +1071,7 @@ function CanvaSlideCopyCenter({
               <div>
                 <p className="text-sm font-bold text-[#172a3a]">{field.label}</p>
               </div>
-              <CopyButton text={field.value} label="Copy" />
+              <CopyButton text={field.value} label="Copy Slide Text" />
             </div>
             <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-[#20313f]">{field.value || "Generated content will appear here."}</p>
             <details className="mt-3 rounded-xl bg-[#f8f5ee] p-3">
@@ -1056,7 +1110,7 @@ function CanvaExportPackageCard({ pack, json }: { pack: ContentPack; json: strin
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-bold uppercase tracking-wide text-[#77633c]">Canva Export Package</p>
-          <h3 className="mt-1 text-lg font-bold text-[#172a3a]">Structured JSON for Canva autofill</h3>
+          <h3 className="mt-1 text-lg font-bold text-[#172a3a]">Structured JSON for future Canva API use</h3>
         </div>
         <div className="flex flex-wrap gap-2">
           <CopyButton text={json} label="Copy Canva Package JSON" />

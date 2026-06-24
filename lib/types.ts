@@ -318,6 +318,10 @@ export type ContentPack = {
   clinical_sensitivity?: "low" | "medium" | "high" | string | null;
   design_status?: "not_started" | "ready_for_canva" | "design_started" | "designed_in_canva" | string | null;
   canva_template_id?: string | null;
+  canva_design_id?: string | null;
+  canva_design_url?: string | null;
+  canva_autofill_enabled?: boolean | null;
+  placeholder_mapping?: Record<string, unknown> | null;
   pack: ContentPackBody;
   canva_brief?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
@@ -329,17 +333,27 @@ export type ContentPack = {
 export type CanvaTemplate = {
   id: string;
   user_id?: string | null;
+  canva_template_id?: string | null;
   template_name: string;
   canva_template_link: string;
+  content_type?: "carousel" | "reel cover" | "Pinterest pin" | "product promo" | "quote post" | string | null;
   format_type: "Instagram carousel" | "Pinterest pin" | "Reel cover" | "Story" | "Workbook promo" | "Blog graphic" | "Quote post" | string;
   dimensions?: string | null;
+  platform_size?: string | null;
+  number_of_slides?: number | null;
   aesthetic_vibe?: string | null;
+  visual_style_notes?: string | null;
   color_palette?: string | null;
   font_style?: string | null;
   graphic_style?: string | null;
   best_use_case?: string | null;
   audience_fit?: string | null;
   content_pillar_fit?: string | null;
+  slide_structure_rules?: Record<string, unknown> | null;
+  canva_design_id?: string | null;
+  canva_design_url?: string | null;
+  canva_autofill_enabled?: boolean | null;
+  placeholder_mapping?: Record<string, unknown> | null;
   recommended_for?: string[];
   approval_status: "draft" | "approved" | "archived";
   notes?: string | null;

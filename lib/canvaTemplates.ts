@@ -2,12 +2,16 @@ export type CanvaTemplateRegistryItem = {
   id: string;
   name: string;
   type: string;
+  content_type: string;
+  platform_size: string;
+  number_of_slides: number;
   platforms: string[];
   best_for: string[];
   audience: string[];
   content_pillars: string[];
   template_url: string;
   description: string;
+  visual_style_notes: string;
   fields: string[];
 };
 
@@ -16,12 +20,16 @@ export const CANVA_TEMPLATES: CanvaTemplateRegistryItem[] = [
     id: "emotional-hook-carousel",
     name: "Emotional Hook Carousel",
     type: "Instagram carousel",
+    content_type: "carousel",
+    platform_size: "1080x1350",
+    number_of_slides: 7,
     platforms: ["Instagram", "Pinterest", "Threads"],
     best_for: ["anxious attachment", "burnout", "people pleasing", "trauma responses"],
     audience: ["emotionally overwhelmed women", "anxious high achievers", "burnt-out millennial moms", "women navigating emotional labor"],
     content_pillars: ["emotional insight", "attachment patterns", "burnout education", "trust-building"],
     template_url: "https://canva.link/cy2tn3g7d4ptpbt",
     description: "A slide-by-slide carousel for emotionally specific recognition posts that help clients feel seen before moving into gentle clinical insight and a grounded CTA.",
+    visual_style_notes: "Emotion-first carousel with clear hierarchy, soft contrast, and enough whitespace for vulnerable recognition copy.",
     fields: [
       "slide1_hook",
       "slide1_subhook",
@@ -37,12 +45,16 @@ export const CANVA_TEMPLATES: CanvaTemplateRegistryItem[] = [
     id: "teen-mental-health-carousel",
     name: "Teen Mental Health Carousel",
     type: "Instagram carousel",
+    content_type: "carousel",
+    platform_size: "1080x1350",
+    number_of_slides: 7,
     platforms: ["Instagram", "Pinterest"],
     best_for: ["teen anxiety", "school stress", "self-esteem", "friendships"],
     audience: ["anxious teen girls", "college-age women", "parents of anxious teens"],
     content_pillars: ["teen mental health", "school stress", "self-esteem support", "therapy education"],
     template_url: "https://canva.link/9z5upp0t97uase5",
     description: "A warm carousel structure for teen-focused psychoeducation, school stress validation, friendship pressure, and workbook or therapy CTAs.",
+    visual_style_notes: "Soft teen-focused education layout with parent-friendly readability and calm school-stress visual cues.",
     fields: [
       "slide1_teen_hook",
       "slide2_school_or_social_pressure",
@@ -57,12 +69,16 @@ export const CANVA_TEMPLATES: CanvaTemplateRegistryItem[] = [
     id: "therapist-education-carousel",
     name: "Therapist Education Carousel",
     type: "Instagram carousel",
+    content_type: "carousel",
+    platform_size: "1080x1350",
+    number_of_slides: 7,
     platforms: ["Instagram", "LinkedIn", "Pinterest"],
     best_for: ["therapy myths", "coping skills", "nervous system education"],
     audience: ["therapy-curious clients", "anxious high achievers", "emotionally exhausted caregivers"],
     content_pillars: ["therapy education", "nervous system education", "clinical clarity", "trust-building"],
     template_url: "https://canva.link/zmhh9b7la0cqok1",
     description: "A clean educational carousel for explaining clinical concepts in plain language without sounding textbook or overly inspirational.",
+    visual_style_notes: "Clean therapist-led teaching layout with simple clinical framing, readable body copy, and grounded CTA space.",
     fields: [
       "slide1_myth_or_question",
       "slide2_plain_language_answer",
@@ -77,12 +93,16 @@ export const CANVA_TEMPLATES: CanvaTemplateRegistryItem[] = [
     id: "pinterest-infographic-pin",
     name: "Pinterest Infographic Pin",
     type: "Pinterest pin",
+    content_type: "Pinterest pin",
+    platform_size: "1000x1500",
+    number_of_slides: 1,
     platforms: ["Pinterest"],
     best_for: ["SEO traffic", "workbook sales", "coping tips"],
     audience: ["Pinterest searchers", "workbook buyers", "anxious women", "parents of anxious teens"],
     content_pillars: ["SEO education", "coping tips", "product funnel", "workbook promotion"],
     template_url: "https://canva.link/3bn083koc2jngda",
     description: "A search-friendly infographic pin for symptom lists, coping steps, workbook tie-ins, and save-worthy mental health education.",
+    visual_style_notes: "Pinterest-first vertical infographic with searchable headline, scannable sections, and product or service CTA space.",
     fields: [
       "pin_title",
       "pin_subtitle",
@@ -98,12 +118,16 @@ export const CANVA_TEMPLATES: CanvaTemplateRegistryItem[] = [
     id: "blog-seo-pin",
     name: "Blog/SEO Pin",
     type: "Blog graphic",
+    content_type: "Pinterest pin",
+    platform_size: "1000x1500",
+    number_of_slides: 1,
     platforms: ["Pinterest", "Blog"],
     best_for: ["sending traffic to the website/blog"],
     audience: ["SEO searchers", "therapy-curious clients", "parents", "anxious high achievers"],
     content_pillars: ["blog SEO", "AI search", "therapy education", "website traffic"],
     template_url: "https://canva.link/h7y6pe2h3t21ej1",
     description: "A website-traffic pin template for long-tail SEO topics, blog promotion, AI-search-friendly content, and therapy service education.",
+    visual_style_notes: "Search-led blog pin with strong title hierarchy, soft editorial support text, and website traffic CTA placement.",
     fields: [
       "seo_title",
       "seo_subtitle",
@@ -118,12 +142,16 @@ export const CANVA_TEMPLATES: CanvaTemplateRegistryItem[] = [
     id: "reel-tiktok-cover",
     name: "Reel/TikTok Cover",
     type: "Reel cover",
+    content_type: "reel cover",
+    platform_size: "1080x1920",
+    number_of_slides: 1,
     platforms: ["TikTok", "Instagram Reels", "YouTube Shorts"],
     best_for: ["talking videos", "therapist POVs", "guided meditations"],
     audience: ["anxious teens", "college-age women", "overwhelmed moms", "emotionally overwhelmed women"],
     content_pillars: ["short-form video", "therapist POV", "guided support", "emotional recognition"],
     template_url: "https://canva.link/b7gngqim4oryszt",
     description: "A short-form video cover template for punchy therapist POV hooks, relatable inner-dialogue videos, and calming guided support.",
+    visual_style_notes: "Vertical cover with high-contrast hook text, creator-native therapist POV feel, and minimal supporting copy.",
     fields: [
       "cover_hook",
       "cover_subhook",
@@ -137,12 +165,16 @@ export const CANVA_TEMPLATES: CanvaTemplateRegistryItem[] = [
     id: "workbook-product-promo-template",
     name: "Workbook/Product Promo Template",
     type: "Workbook promo",
+    content_type: "product promo",
+    platform_size: "1080x1350",
+    number_of_slides: 1,
     platforms: ["Instagram", "Pinterest", "Facebook", "Email"],
     best_for: ["teen workbook", "anxiety workbook", "journals", "coloring books"],
     audience: ["workbook buyers", "parents of anxious teens", "anxious women", "journal users"],
     content_pillars: ["product promotion", "workbook funnel", "self-guided support", "seasonal marketing"],
     template_url: "https://canva.link/vamp5uty17yuvm7",
     description: "A product promo template for workbooks, journals, coloring books, and toolkits that keeps the offer warm, grounded, and visually on-brand.",
+    visual_style_notes: "Product-led layout with pain point, transformation, preview detail, and clear purchase or download CTA.",
     fields: [
       "product_name",
       "product_hook",

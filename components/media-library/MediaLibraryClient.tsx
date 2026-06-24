@@ -207,7 +207,7 @@ function AssetCard({ asset, onPatch, onDelete }: { asset: MediaLibraryAsset; onP
           <button className="btn-secondary" onClick={copyText}><Copy size={16} />Copy text</button>
           {isMedia && asset.media_url ? <a className="btn-secondary" href={asset.media_url} download><Download size={16} />Download</a> : <button className="btn-secondary" onClick={downloadText}><Download size={16} />Download</button>}
           <button className="btn-secondary" onClick={() => onPatch({ metadata: { ...(asset.metadata || {}), campaignSavedAt: new Date().toISOString() } }, "Saved to campaign placeholder.")}><FolderPlus size={16} />Save to campaign</button>
-          <button className="btn-secondary" onClick={() => onPatch({ metadata: { ...(asset.metadata || {}), sentToCanvaAt: new Date().toISOString() } }, "Canva placeholder recorded.")}><Send size={16} />Send to Canva</button>
+          <button className="btn-secondary" onClick={() => onPatch({ metadata: { ...(asset.metadata || {}), canvaPrepRecordedAt: new Date().toISOString() } }, "Canva prep placeholder recorded.")}><Send size={16} />Prepare Canva Copy</button>
           <button className="btn-secondary" onClick={() => onPatch({ status: "used" }, "Marked as used.")}>Mark as used</button>
           <button className="btn-secondary" onClick={() => onPatch({ status: "archived" }, "Archived.")}><Archive size={16} />Archive</button>
           <button className="btn-secondary text-rose-700" onClick={onDelete}><Trash2 size={16} />Delete</button>
