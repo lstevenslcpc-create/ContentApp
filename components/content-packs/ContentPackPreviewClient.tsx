@@ -1,9 +1,19 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Edit3, Loader2, RefreshCw, Save, ShieldCheck } from "lucide-react";
+import { ArrowRight, CalendarPlus, CheckCircle2, Edit3, Loader2, Palette, RefreshCw, Save, ShieldCheck } from "lucide-react";
 import { authedFetch } from "@/lib/apiClient";
 import { CopyButton } from "@/components/CopyButton";
+import {
+  isWorkflowApproved,
+  isWorkflowCanvaPrepared,
+  isWorkflowDesigned,
+  isWorkflowPosted,
+  isWorkflowReadyToPost,
+  isWorkflowScheduled,
+  WorkflowStatusBar
+} from "@/components/WorkflowStatusBar";
 import type { ContentPack, ContentPackBody, ContentPackSectionKey, ContentStatus } from "@/lib/types";
 
 const sections: Array<{ key: ContentPackSectionKey; label: string; tone: string }> = [
@@ -83,7 +93,7 @@ export function ContentPackPreviewClient({ packId }: { packId: string }) {
     return sections.map((section) => `${section.label}\n${draftPack[section.key] || ""}`).join("\n\n---\n\n");
   }, [draftPack]);
 
-  async function savePatch(updates: { pack?: ContentPackBody; status?: ContentStatus }) {
+  async function savePatch(updates: { pack?: ContentPackBody; status?: ContentStatus }, success = "Content pack saved.") {
     if (packId.startsWith("temporary-")) {
       const nextPack = {
         ...pack,
@@ -116,7 +126,7 @@ export function ContentPackPreviewClient({ packId }: { packId: string }) {
     setPack(nextPack);
     setDraftPack(nextPack.pack);
     setEditing(null);
-    setMessage("Content pack saved.");
+    setMessage(success);
   }
 
   async function regenerate(sectionKey?: ContentPackSectionKey) {
@@ -197,6 +207,9 @@ export function ContentPackPreviewClient({ packId }: { packId: string }) {
         <MetaCard label="Sensitivity" value={pack.clinical_sensitivity || "medium"} />
       </section>
 
+      <WorkflowStatusBar pack={pack} />
+      <NextStepPanel pack={pack} onApprove={() => savePatch({ status: "approved" }, "Content approved.")} busy={Boolean(busy)} />
+
       <section className="rounded-3xl border border-[#e9dfcf] bg-white/90 p-5 shadow-sm">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
@@ -208,7 +221,7 @@ export function ContentPackPreviewClient({ packId }: { packId: string }) {
               <button
                 key={status}
                 className={`rounded-full px-3 py-2 text-xs font-bold transition ${pack.status === status ? "bg-[#172a3a] text-white" : "bg-[#f7f1e6] text-[#77633c] hover:bg-[#eadfc8]"}`}
-                onClick={() => savePatch({ status })}
+                onClick={() => savePatch({ status }, status === "approved" ? "Content approved." : "Content pack saved.")}
                 disabled={Boolean(busy)}
               >
                 {status}
@@ -278,5 +291,80 @@ function MetaCard({ label, value }: { label: string; value: string }) {
       <p className="text-xs font-bold uppercase tracking-wide text-[#77633c]">{label}</p>
       <p className="mt-2 text-lg font-bold capitalize text-[#172a3a]">{value}</p>
     </div>
+  );
+}
+
+function NextStepPanel({ pack, onApprove, busy }: { pack: ContentPack; onApprove: () => void; busy: boolean }) {
+  const approved = isWorkflowApproved(pack);
+  const canvaPrepared = isWorkflowCanvaPrepared(pack);
+  const designed = isWorkflowDesigned(pack);
+  const scheduled = isWorkflowScheduled(pack);
+  const ready = isWorkflowReadyToPost(pack);
+  const posted = isWorkflowPosted(pack);
+
+  const actions = [];
+  if (!approved) {
+    actions.push(
+      <button key="approve" className="btn-primary bg-[#172a3a] hover:bg-[#22384a]" onClick={onApprove} disabled={busy}>
+        <CheckCircle2 size={16} />
+        Approve Content
+      </button>
+    );
+  }
+  if (approved && !canvaPrepared) {
+    actions.push(
+      <Link key="canva" className="btn-secondary" href="/approval-review">
+        <Palette size={16} />
+        Prepare Canva Copy
+      </Link>
+    );
+  }
+  if (canvaPrepared && !designed) {
+    actions.push(
+      <Link key="designed" className="btn-secondary" href="/approval-review">
+        <Palette size={16} />
+        Mark Designed in Canva
+      </Link>
+    );
+  }
+  if (approved && designed && !scheduled) {
+    actions.push(
+      <Link key="schedule" className="btn-secondary" href="/content-calendar">
+        <CalendarPlus size={16} />
+        Schedule Post
+      </Link>
+    );
+  }
+  if (scheduled && !posted) {
+    actions.push(
+      <Link key="ready" className="btn-secondary" href="/ready-to-post">
+        <ArrowRight size={16} />
+        Go to Ready to Post
+      </Link>
+    );
+  }
+  if (ready) {
+    actions.push(
+      <Link key="post" className="btn-primary bg-[#172a3a] hover:bg-[#22384a]" href="/ready-to-post">
+        <CheckCircle2 size={16} />
+        Mark Posted
+      </Link>
+    );
+  }
+
+  return (
+    <section className="rounded-3xl border border-[#e9dfcf] bg-white/90 p-5 shadow-sm">
+      <p className="text-xs font-bold uppercase tracking-wide text-[#77633c]">Next Step</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {posted ? (
+          <span className="rounded-full bg-[#eef3ec] px-3 py-2 text-sm font-bold text-[#4f6f5a]">Post marked as posted.</span>
+        ) : actions.length ? actions : (
+          <Link className="btn-secondary" href="/approval-review">
+            <ArrowRight size={16} />
+            Open in Approval Review
+          </Link>
+        )}
+      </div>
+    </section>
   );
 }

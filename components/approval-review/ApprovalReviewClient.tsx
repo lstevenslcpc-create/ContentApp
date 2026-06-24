@@ -7,6 +7,7 @@ import { authedFetch } from "@/lib/apiClient";
 import { CANVA_TEMPLATES, type CanvaTemplateRegistryItem } from "@/lib/canvaTemplates";
 import { CopyButton } from "@/components/CopyButton";
 import { ContentLifecycleActions } from "@/components/ContentLifecycleActions";
+import { WorkflowStatusBar } from "@/components/WorkflowStatusBar";
 import type { CanvaTemplate, ContentPack, ContentPackBody, ContentPackSectionKey, ContentStatus } from "@/lib/types";
 
 const statuses: Array<ContentStatus | "all"> = ["all", "draft", "needs_review", "approved", "scheduled", "posted", "failed"];
@@ -461,6 +462,7 @@ export function ApprovalReviewClient() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
+  const [handoff, setHandoff] = useState<{ kind: "approved" | "canva" | "scheduled" | "designed" | ""; packId: string }>({ kind: "", packId: "" });
   const [showArchived, setShowArchived] = useState(false);
 
   async function loadPacks() {
@@ -534,9 +536,10 @@ export function ApprovalReviewClient() {
     setSelectedTemplateId((current) => current === preferredTemplateId ? current : preferredTemplateId);
   }, [selected, templates]);
 
-  async function patchPack(packId: string, updates: Record<string, unknown>, success: string) {
+  async function patchPack(packId: string, updates: Record<string, unknown>, success: string, handoffKind: "approved" | "canva" | "scheduled" | "designed" | "" = "") {
     setBusy(`${packId}:${JSON.stringify(updates)}`);
     setMessage("");
+    setHandoff({ kind: "", packId: "" });
     const response = await authedFetch(`/api/content-packs/${packId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -552,6 +555,7 @@ export function ApprovalReviewClient() {
     setPacks((current) => current.map((pack) => pack.id === packId ? updated : pack));
     setSelectedId(packId);
     setMessage(success);
+    setHandoff({ kind: handoffKind, packId });
   }
 
   async function archivePack(pack: ContentPack, archived: boolean) {
@@ -635,7 +639,7 @@ export function ApprovalReviewClient() {
       setMessage(typeof data.error === "string" ? data.error : "Unable to schedule content pack.");
       return;
     }
-    await patchPack(pack.id, { status: "scheduled" }, "Content pack scheduled on the calendar.");
+    await patchPack(pack.id, { status: "scheduled" }, "Added to Content Calendar.", "scheduled");
   }
 
   async function selectTemplateForPack(templateId: string) {
@@ -693,7 +697,25 @@ export function ApprovalReviewClient() {
         </label>
       </section>
 
-      {message && <p className="rounded-2xl bg-[#eef3ec] p-4 text-sm font-semibold text-[#4f6f5a]">{message}</p>}
+      {message && (
+        <div className="rounded-2xl bg-[#eef3ec] p-4 text-sm font-semibold text-[#4f6f5a]">
+          <p>{message}</p>
+          <HandoffActions
+            kind={handoff.kind}
+            pack={packs.find((pack) => pack.id === handoff.packId) || null}
+            busy={Boolean(busy)}
+            onPrepareCanva={(pack) => {
+              const match = bestTemplateMatch(pack, templates);
+              void patchPack(pack.id, { canvaTemplateId: match?.template.id || selectedTemplate?.id || null, metadata: metadataWithCanva(pack, "ready_for_canva", match?.template || selectedTemplate, match) }, "Canva copy prepared.", "canva");
+            }}
+            onSchedule={(pack) => void schedule(pack)}
+            onDesigned={(pack) => {
+              const match = bestTemplateMatch(pack, templates);
+              void patchPack(pack.id, { canvaTemplateId: selectedTemplate?.id || match?.template.id || null, designStatus: "designed_in_canva", metadata: metadataWithCanva(pack, "designed_in_canva", selectedTemplate || match?.template, selectedTemplateMatch || match) }, "Marked as designed in Canva.", "designed");
+            }}
+          />
+        </div>
+      )}
 
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_440px]">
         <div className="space-y-4">
@@ -706,12 +728,12 @@ export function ApprovalReviewClient() {
               selected={selected?.id === pack.id}
               busy={busy.startsWith(pack.id)}
               onSelect={() => setSelectedId(pack.id)}
-              onApprove={() => patchPack(pack.id, { status: "approved" }, "Content pack approved.")}
+              onApprove={() => patchPack(pack.id, { status: "approved" }, "Content approved.", "approved")}
               onDraft={() => patchPack(pack.id, { status: "draft" }, "Content pack sent back to draft.")}
               onNeedsReview={() => patchPack(pack.id, { status: "needs_review" }, "Content pack marked needs review.")}
               onCanva={() => {
                 const match = bestTemplateMatch(pack, templates);
-                patchPack(pack.id, { canvaTemplateId: match?.template.id || selectedTemplate?.id || null, metadata: metadataWithCanva(pack, "ready_for_canva", match?.template || selectedTemplate, match) }, "Canva copy prepared with template match saved.");
+                patchPack(pack.id, { canvaTemplateId: match?.template.id || selectedTemplate?.id || null, metadata: metadataWithCanva(pack, "ready_for_canva", match?.template || selectedTemplate, match) }, "Canva copy prepared.", "canva");
               }}
               onDesignStarted={() => {
                 const match = bestTemplateMatch(pack, templates);
@@ -719,7 +741,7 @@ export function ApprovalReviewClient() {
               }}
               onDesigned={() => {
                 const match = bestTemplateMatch(pack, templates);
-                patchPack(pack.id, { canvaTemplateId: selectedTemplate?.id || match?.template.id || null, designStatus: "designed_in_canva", metadata: metadataWithCanva(pack, "designed_in_canva", selectedTemplate || match?.template, selectedTemplateMatch || match) }, "Marked as designed in Canva.");
+                patchPack(pack.id, { canvaTemplateId: selectedTemplate?.id || match?.template.id || null, designStatus: "designed_in_canva", metadata: metadataWithCanva(pack, "designed_in_canva", selectedTemplate || match?.template, selectedTemplateMatch || match) }, "Marked as designed in Canva.", "designed");
               }}
               scheduleDate={scheduleDate}
               setScheduleDate={setScheduleDate}
@@ -731,7 +753,7 @@ export function ApprovalReviewClient() {
           )) : (
             <div className="rounded-3xl border border-dashed border-[#d8c28a] bg-white p-8 text-center">
               <p className="text-lg font-bold text-[#172a3a]">No content packs match these filters.</p>
-              <p className="mt-2 text-sm text-[#6f766f]">Only Content Packs appear here. Generate content or choose a Content Intelligence idea, then create a pack first.</p>
+              <p className="mt-2 text-sm text-[#6f766f]">Only Content Packs appear here. Generate content or create a Content Pack first.</p>
             </div>
           )}
         </div>
@@ -852,6 +874,70 @@ function FilterSelect({ label, value, onChange, options }: { label: string; valu
   );
 }
 
+function HandoffActions({
+  kind,
+  pack,
+  busy,
+  onPrepareCanva,
+  onSchedule,
+  onDesigned
+}: {
+  kind: "approved" | "canva" | "scheduled" | "designed" | "";
+  pack: ContentPack | null;
+  busy: boolean;
+  onPrepareCanva: (pack: ContentPack) => void;
+  onSchedule: (pack: ContentPack) => void;
+  onDesigned: (pack: ContentPack) => void;
+}) {
+  if (!kind || !pack) return null;
+
+  return (
+    <div className="mt-3 flex flex-wrap gap-2">
+      {kind === "approved" ? (
+        <>
+          <button className="btn-secondary bg-white" type="button" disabled={busy} onClick={() => onPrepareCanva(pack)}>
+            <Send size={16} />
+            Prepare Canva Copy
+          </button>
+          <button className="btn-secondary bg-white" type="button" disabled={busy} onClick={() => onSchedule(pack)}>
+            <CalendarPlus size={16} />
+            Schedule Post
+          </button>
+        </>
+      ) : null}
+      {kind === "canva" ? (
+        <>
+          {metadataString(pack, "selectedCanvaTemplateLink") ? (
+            <a className="btn-secondary bg-white" href={metadataString(pack, "selectedCanvaTemplateLink")} target="_blank" rel="noreferrer">
+              <ExternalLink size={16} />
+              Open Canva Template
+            </a>
+          ) : null}
+          <button className="btn-secondary bg-white" type="button" disabled={busy} onClick={() => onDesigned(pack)}>
+            <Palette size={16} />
+            Mark Designed in Canva
+          </button>
+        </>
+      ) : null}
+      {kind === "scheduled" ? (
+        <>
+          <Link className="btn-secondary bg-white" href="/content-calendar">View Calendar</Link>
+          <Link className="btn-secondary bg-white" href="/ready-to-post">Go to Ready to Post</Link>
+        </>
+      ) : null}
+      {kind === "designed" ? (
+        <>
+          <button className="btn-secondary bg-white" type="button" disabled={busy} onClick={() => onSchedule(pack)}>
+            <CalendarPlus size={16} />
+            Schedule Post
+          </button>
+          <Link className="btn-secondary bg-white" href="/ready-to-post">Go to Ready to Post</Link>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 function PackReviewCard({ pack, selected, busy, onSelect, onApprove, onDraft, onNeedsReview, onCanva, onDesignStarted, onDesigned, scheduleDate, setScheduleDate, onSchedule, onArchive, onRestore, onDelete }: {
   pack: ContentPack;
   selected: boolean;
@@ -886,8 +972,12 @@ function PackReviewCard({ pack, selected, busy, onSelect, onApprove, onDraft, on
         <Link className="btn-secondary shrink-0" href={`/content-packs/${pack.id}`}><Edit3 size={16} />Edit Content</Link>
       </div>
 
+      <div className="mt-4">
+        <WorkflowStatusBar pack={pack} compact />
+      </div>
+
       <div className="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-        <button className="btn-primary bg-[#172a3a] hover:bg-[#22384a]" onClick={onApprove} disabled={busy}><CheckCircle2 size={16} />Approve</button>
+        <button className="btn-primary bg-[#172a3a] hover:bg-[#22384a]" onClick={onApprove} disabled={busy}><CheckCircle2 size={16} />Approve Content</button>
         <button className="btn-secondary" onClick={onDraft} disabled={busy}><RotateCcw size={16} />Send to Draft</button>
         <button className="btn-secondary" onClick={onNeedsReview} disabled={busy}><Sparkles size={16} />Needs Review</button>
         <button className="btn-secondary" onClick={onCanva} disabled={busy}><Send size={16} />Prepare Canva Copy</button>
@@ -898,9 +988,9 @@ function PackReviewCard({ pack, selected, busy, onSelect, onApprove, onDraft, on
           <span className="label">Schedule on calendar</span>
           <input className="field mt-1" type="date" value={scheduleDate} onChange={(event) => setScheduleDate(event.target.value)} />
         </label>
-        <button className="btn-secondary" onClick={onSchedule} disabled={busy}><CalendarPlus size={16} />Schedule</button>
+        <button className="btn-secondary" onClick={onSchedule} disabled={busy}><CalendarPlus size={16} />Schedule Post</button>
         <button className="btn-secondary" onClick={onDesignStarted} disabled={busy}><Palette size={16} />Mark Design Started</button>
-        <button className="btn-secondary border-[#d8c28a] text-[#77633c]" onClick={onDesigned} disabled={busy}><Palette size={16} />Mark Designed</button>
+        <button className="btn-secondary border-[#d8c28a] text-[#77633c]" onClick={onDesigned} disabled={busy}><Palette size={16} />Mark Designed in Canva</button>
         <ContentLifecycleActions
           archived={isPackArchived(pack)}
           busy={busy}

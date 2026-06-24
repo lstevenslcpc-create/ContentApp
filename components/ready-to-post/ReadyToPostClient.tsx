@@ -1,10 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, ExternalLink, Loader2, Megaphone, Send, XCircle } from "lucide-react";
 import { authedFetch } from "@/lib/apiClient";
 import { CopyButton } from "@/components/CopyButton";
 import { ContentLifecycleActions } from "@/components/ContentLifecycleActions";
+import { getWorkflowMissingReasons, isWorkflowReadyToPost, WorkflowStatusBar } from "@/components/WorkflowStatusBar";
 import type { ContentCalendarPlan, ContentPack } from "@/lib/types";
 
 type CalendarResponse = {
@@ -52,8 +54,7 @@ function designStatus(pack: ContentPack) {
 }
 
 function isDesigned(pack: ContentPack) {
-  const status = designStatus(pack);
-  return status === "design_started" || status === "designed_in_canva";
+  return designStatus(pack) === "designed_in_canva";
 }
 
 function postingStatus(pack: ContentPack) {
@@ -180,8 +181,13 @@ export function ReadyToPostClient() {
 
   const readyPacks = useMemo(() => visiblePacks.filter((pack) => {
     const status = postingStatus(pack);
-    return pack.status === "approved" && isDesigned(pack) && status !== "posted" && status !== "failed";
-  }), [visiblePacks]);
+    return isWorkflowReadyToPost(pack, plans) && status !== "posted" && status !== "failed";
+  }), [visiblePacks, plans]);
+
+  const notReadyPacks = useMemo(() => visiblePacks.filter((pack) => {
+    const status = postingStatus(pack);
+    return status !== "posted" && status !== "failed" && !readyPacks.some((readyPack) => readyPack.id === pack.id);
+  }), [readyPacks, visiblePacks]);
 
   const historyPacks = useMemo(() => visiblePacks.filter((pack) => {
     const status = postingStatus(pack);
@@ -223,7 +229,7 @@ export function ReadyToPostClient() {
     }
     const updated = data.pack as ContentPack;
     setPacks((current) => current.map((item) => item.id === updated.id ? updated : item));
-    setMessage(status === "posted" ? "Marked as posted and moved to Posted History." : "Marked as failed and moved to Posted History.");
+    setMessage(status === "posted" ? "Post marked as posted." : "Post marked as failed.");
   }
 
   async function archivePack(pack: ContentPack, archived: boolean) {
@@ -293,7 +299,33 @@ export function ReadyToPostClient() {
       {!loading && readyPacks.length === 0 ? (
         <section className="rounded-3xl border border-dashed border-[#d8c28a] bg-white p-8 text-center">
           <p className="text-lg font-bold text-[#172a3a]">No approved designed content is ready yet.</p>
-          <p className="mt-2 text-sm text-[#6f766f]">Approve a content pack, send it through Canva Prep, and mark design started or designed in Canva.</p>
+          <p className="mt-2 text-sm text-[#6f766f]">Posts appear here after they are approved, designed in Canva, and not yet posted.</p>
+        </section>
+      ) : null}
+
+      {!loading && notReadyPacks.length ? (
+        <section className="rounded-3xl border border-[#e9dfcf] bg-white p-5 shadow-sm">
+          <details>
+            <summary className="cursor-pointer text-sm font-bold text-[#77633c]">Why isn&apos;t this ready?</summary>
+            <div className="mt-4 grid gap-3">
+              {notReadyPacks.slice(0, 8).map((pack) => (
+                <div key={pack.id} className="rounded-2xl bg-[#fffdf8] p-4 ring-1 ring-[#eadfc8]">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-bold text-[#172a3a]">{pack.title}</p>
+                      <p className="mt-1 text-xs text-[#6f766f]">Content Pack status: {pack.status.replaceAll("_", " ")}</p>
+                    </div>
+                    <Link className="text-xs font-bold text-[#4d3a7a]" href={`/content-packs/${pack.id}`}>Open Content Pack</Link>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {getWorkflowMissingReasons(pack, plans).map((reason) => (
+                      <span key={reason} className="rounded-full bg-[#fff4d8] px-3 py-1 text-xs font-bold text-[#8a6926]">{reason}</span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </details>
         </section>
       ) : null}
 
@@ -371,6 +403,10 @@ function PostingCard({ pack, plans, busy, onStatus, onArchive, onDelete }: {
         <InfoRow label="CTA" value={cta || "No CTA saved yet."} />
       </div>
 
+      <div className="mt-4">
+        <WorkflowStatusBar pack={pack} plans={plans} compact />
+      </div>
+
       <div className="mt-4 rounded-2xl bg-[#f8f5ee] p-4 ring-1 ring-[#eadfc8]">
         <p className="text-xs font-bold uppercase tracking-wide text-[#77633c]">Posting checklist</p>
         <div className="mt-3 grid gap-2">
@@ -386,10 +422,10 @@ function PostingCard({ pack, plans, busy, onStatus, onArchive, onDelete }: {
       <div className="mt-4 grid gap-2 sm:grid-cols-2">
         <CopyButton text={captionWithoutHashtags(caption) || caption} label="Copy caption" />
         <CopyButton text={hashtagText} label="Copy hashtags" />
-        {canvaLink ? <a className="btn-secondary" href={canvaLink} target="_blank" rel="noreferrer"><ExternalLink size={16} />Open Canva template</a> : null}
+        {canvaLink ? <a className="btn-secondary" href={canvaLink} target="_blank" rel="noreferrer"><ExternalLink size={16} />Open Canva Template</a> : null}
         {socialLinks().map((link) => <a key={link.href} className="btn-secondary" href={link.href} target="_blank" rel="noreferrer"><ExternalLink size={16} />{link.label}</a>)}
-        <button className="btn-primary bg-[#172a3a] hover:bg-[#22384a]" disabled={busy} onClick={() => onStatus(pack, "posted")}><Send size={16} />Mark posted</button>
-        <button className="btn-secondary border-[#d8c28a] text-[#77633c]" disabled={busy} onClick={() => onStatus(pack, "failed")}><XCircle size={16} />Mark failed</button>
+        <button className="btn-primary bg-[#172a3a] hover:bg-[#22384a]" disabled={busy} onClick={() => onStatus(pack, "posted")}><Send size={16} />Mark Posted</button>
+        <button className="btn-secondary border-[#d8c28a] text-[#77633c]" disabled={busy} onClick={() => onStatus(pack, "failed")}><XCircle size={16} />Mark Failed</button>
         <ContentLifecycleActions
           archived={isPackArchived(pack)}
           busy={busy}
@@ -444,6 +480,9 @@ function HistoryCard({ pack, busy, onArchive, onDelete }: {
             onDelete={() => onDelete(pack)}
           />
         </div>
+      </div>
+      <div className="mt-3">
+        <WorkflowStatusBar pack={pack} compact />
       </div>
       <div className="mt-4 grid gap-2 md:grid-cols-5">
         {["views", "saves", "shares", "clicks", "notes"].map((item) => (

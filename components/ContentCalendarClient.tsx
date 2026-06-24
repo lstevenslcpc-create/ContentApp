@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, Loader2, Plus, Save, Sparkles } from "lucide-react";
 import { authedFetch } from "@/lib/apiClient";
 import { ContentLifecycleActions } from "@/components/ContentLifecycleActions";
+import { WorkflowStatusBar } from "@/components/WorkflowStatusBar";
 import type { CalendarPlanStatus, ContentCalendarFocus, ContentCalendarPlan, ContentPack } from "@/lib/types";
 
 const campaignLabels = [
@@ -89,6 +90,7 @@ export function ContentCalendarClient() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState("");
   const [message, setMessage] = useState("");
+  const [calendarHandoff, setCalendarHandoff] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
 
   const visibleDays = useMemo(() => view === "month" ? monthDays(anchor) : weekDays(anchor), [anchor, view]);
@@ -153,6 +155,7 @@ export function ContentCalendarClient() {
   async function addPlan() {
     setSaving("plan");
     setMessage("");
+    setCalendarHandoff(false);
     const response = await authedFetch("/api/content-calendar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -174,7 +177,8 @@ export function ContentCalendarClient() {
     }
     setPlans((current) => [data.plan as ContentCalendarPlan, ...current]);
     setNotes("");
-    setMessage("Content pack added to the calendar.");
+    setMessage("Added to Content Calendar.");
+    setCalendarHandoff(true);
   }
 
   async function updateStatus(planId: string, nextStatus: CalendarPlanStatus) {
@@ -379,7 +383,7 @@ export function ContentCalendarClient() {
 
             <button className="btn-primary mt-4 w-full bg-[#172a3a] py-3 hover:bg-[#22384a]" onClick={addPlan} disabled={Boolean(saving)}>
               {saving === "plan" ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} />}
-              Add Content Pack
+              Schedule Post
             </button>
             {!visiblePacks.length && <p className="mt-3 text-xs leading-5 text-[#8a6926]">Create and save a Content Pack first, then assign it to campaign dates here.</p>}
           </section>
@@ -390,14 +394,24 @@ export function ContentCalendarClient() {
               {(plansByDate[selectedDate] || []).length ? plansByDate[selectedDate].map((plan) => (
                 <PlanCard key={plan.id} plan={plan} saving={saving === plan.id || Boolean(plan.content_pack_id && saving.startsWith(plan.content_pack_id))} onStatus={updateStatus} onArchive={archivePack} onDelete={deletePack} />
               )) : (
-                <p className="rounded-2xl border border-dashed border-[#eadfc8] bg-[#fffdf8] p-4 text-sm text-[#6f766f]">No content packs assigned to this date yet.</p>
+                <p className="rounded-2xl border border-dashed border-[#eadfc8] bg-[#fffdf8] p-4 text-sm text-[#6f766f]">Scheduled Content Packs appear here after you assign a date.</p>
               )}
             </div>
           </section>
         </aside>
       </section>
 
-      {message && <p className="rounded-2xl bg-[#eef3ec] p-4 text-sm font-semibold text-[#4f6f5a]">{message}</p>}
+      {message && (
+        <div className="rounded-2xl bg-[#eef3ec] p-4 text-sm font-semibold text-[#4f6f5a]">
+          <p>{message}</p>
+          {calendarHandoff ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Link className="btn-secondary bg-white" href="/content-calendar">View Calendar</Link>
+              <Link className="btn-secondary bg-white" href="/ready-to-post">Go to Ready to Post</Link>
+            </div>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }
@@ -442,6 +456,11 @@ function PlanCard({ plan, saving, onStatus, onArchive, onDelete }: {
           ) : null}
         </div>
       </div>
+      {plan.content_pack ? (
+        <div className="mt-3">
+          <WorkflowStatusBar pack={plan.content_pack} plans={[plan]} compact />
+        </div>
+      ) : null}
       <div className="mt-3 flex flex-wrap gap-2">
         {[plan.campaign_label, plan.seasonal_prompt].filter(Boolean).map((label) => <span key={label} className="rounded-full bg-[#f7f1e6] px-2 py-1 text-[11px] font-bold text-[#77633c]">{label}</span>)}
       </div>
