@@ -9,6 +9,7 @@ import { StatusPill } from "./StatusPill";
 import { useState } from "react";
 import { SaveToLibraryButton } from "./media-library/SaveToLibraryButton";
 import { ContentLifecycleActions } from "./ContentLifecycleActions";
+import { assessTopicFidelity } from "@/lib/topicFidelity";
 
 const improveActions = [
   { action: "regenerate_hook", label: "Regenerate hook only" },
@@ -22,7 +23,8 @@ const improveActions = [
   { action: "rewrite_instagram", label: "Rewrite for Instagram" },
   { action: "rewrite_tiktok", label: "Rewrite for TikTok" },
   { action: "rewrite_pinterest", label: "Rewrite for Pinterest" },
-  { action: "rewrite_carousel", label: "Rewrite as carousel slide copy" }
+  { action: "rewrite_carousel", label: "Rewrite as carousel slide copy" },
+  { action: "regenerate_to_match_topic", label: "Regenerate to Match Topic" }
 ];
 
 export function ContentCard({ item, onUpdate, onRemove }: { item: GeneratedContent; onUpdate?: (item: GeneratedContent) => void; onRemove?: (id: string) => void }) {
@@ -130,6 +132,14 @@ export function ContentCard({ item, onUpdate, onRemove }: { item: GeneratedConte
   const whyThisWorks = item.why_this_works;
   const revisionCount = Array.isArray(whyThisWorks?.revision_history) ? whyThisWorks.revision_history.length : 0;
   const productionPackId = linkedPackId || item.content_pack_id || "";
+  const topicFidelity = whyThisWorks?.topic_fidelity || assessTopicFidelity({
+    requestedTopic: item.topic || "",
+    contentAngle: item.content_angle,
+    hook: item.hook,
+    caption: item.caption,
+    visualIdea: item.visual_idea,
+    script: item.script
+  });
 
   return (
     <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -147,6 +157,43 @@ export function ContentCard({ item, onUpdate, onRemove }: { item: GeneratedConte
       </div>
 
       <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-slate-700">{item.caption}</p>
+      {item.topic ? (
+        <section className={`mt-4 rounded-xl border p-4 text-sm ${
+          topicFidelity.topicMatch === "Strong"
+            ? "border-[#cbdcc7] bg-[#eef3ec] text-[#355642]"
+            : topicFidelity.topicMatch === "Partial"
+              ? "border-[#eadfc8] bg-[#fffaf1] text-[#77633c]"
+              : "border-[#f0c7c2] bg-[#fff7f5] text-[#a94b4b]"
+        }`}>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide">Requested topic</p>
+              <p className="mt-1 font-semibold">{topicFidelity.requestedTopic}</p>
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide">Generated focus</p>
+              <p className="mt-1 font-semibold">{topicFidelity.generatedFocus}</p>
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide">Topic match</p>
+              <p className="mt-1 font-semibold">{topicFidelity.topicMatch}</p>
+            </div>
+          </div>
+          {topicFidelity.warning ? <p className="mt-3 font-semibold">{topicFidelity.warning}</p> : null}
+          {topicFidelity.reasons.length ? <p className="mt-2 leading-6">{topicFidelity.reasons.join(" ")}</p> : null}
+          {topicFidelity.topicMatch !== "Strong" ? (
+            <button
+              type="button"
+              className="btn-secondary mt-3 bg-white"
+              disabled={Boolean(busyAction)}
+              onClick={() => void improveContent("regenerate_to_match_topic")}
+            >
+              {busyAction === "regenerate_to_match_topic" ? <Loader2 className="animate-spin" size={16} /> : <WandSparkles size={16} />}
+              Regenerate to Match Topic
+            </button>
+          ) : null}
+        </section>
+      ) : null}
       {!!item.hashtags?.length && <p className="mt-3 text-sm font-semibold text-slate-600">{item.hashtags.join(" ")}</p>}
       {item.visual_idea && <p className="mt-4 rounded-lg bg-slate-50 p-3 text-sm text-slate-700"><b>Suggested visual:</b> {item.visual_idea}</p>}
       {item.script && <p className="mt-3 rounded-lg bg-blue-50 p-3 text-sm text-blue-950"><b>Short script:</b> {item.script}</p>}

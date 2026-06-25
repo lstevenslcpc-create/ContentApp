@@ -201,6 +201,13 @@ export type ContentWhyThisWorks = {
   psychological_angle: string;
   cta_strategy: string;
   suggested_template: string;
+  topic_fidelity?: {
+    requestedTopic: string;
+    generatedFocus: string;
+    topicMatch: "Strong" | "Partial" | "Drifted";
+    warning?: string;
+    reasons: string[];
+  };
   selected_framework?: string;
   framework_explanation?: string;
   practical_application?: string;

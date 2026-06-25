@@ -24,7 +24,8 @@ const improveActions: ContentImproveAction[] = [
   "rewrite_instagram",
   "rewrite_tiktok",
   "rewrite_pinterest",
-  "rewrite_carousel"
+  "rewrite_carousel",
+  "regenerate_to_match_topic"
 ];
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -111,7 +112,11 @@ export async function POST(request: Request, context: RouteContext) {
 
     const updates = await improveGeneratedContent(current, action as ContentImproveAction, brandBrain);
     const revision = generatedRevisionSnapshot(current, action);
-    const whyThisWorks = pushRevisionHistory(current.why_this_works, revision);
+    const whyThisWorks = pushRevisionHistory(
+      updates.why_this_works ? { ...(current.why_this_works || {}), ...updates.why_this_works } : current.why_this_works,
+      revision
+    );
+    delete updates.why_this_works;
 
     const { data, error } = await supabase
       .from("generated_content")

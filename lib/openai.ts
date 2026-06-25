@@ -9,6 +9,7 @@ import { buildExampleBrief } from "./realLifeExampleEngine";
 import { buildTherapistInsightBrief } from "./therapistInsightEngine";
 import { buildTherapistObservationBrief } from "./therapistObservationEngine";
 import { applyLionHeartVoiceGuidance, scoreLionHeartVoice } from "./lionheartVoiceLibrary";
+import { assessTopicFidelity, attachmentTopicRepairCopy, topicFidelityInstruction } from "./topicFidelity";
 
 type GeneratedPost = {
   hook: string;
@@ -754,6 +755,14 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
         quality_checklist: whyThisWorks.quality_checklist || qualityChecklist({ ...post, therapistInsight, therapistObservation, LionHeartStyleNote, behaviors, bodySigns, whatThisCanLookLike }, request)
       }
     });
+    const topicFidelity = assessTopicFidelity({
+      requestedTopic: request.topic,
+      contentAngle: normalizedPost.content_angle,
+      hook: normalizedPost.hook,
+      caption: normalizedPost.caption,
+      visualIdea: normalizedPost.visual_idea,
+      script: normalizedPost.script
+    });
     let repairedPost = normalizedPost;
     let checklist = qualityChecklist(repairedPost, request);
     const concreteExample = String(repairedPost.why_this_works.real_life_example_used || whatThisCanLookLike[0] || behaviors[0] || "").trim();
@@ -786,6 +795,7 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
       ...repairedPost,
       why_this_works: {
         ...repairedPost.why_this_works,
+        topic_fidelity: topicFidelity,
         lionheart_voice_check: scoreLionHeartVoice(
           [repairedPost.hook, repairedPost.caption, repairedPost.script, repairedPost.visual_idea].filter(Boolean).join("\n\n"),
           { topic: request.topic, goal: request.contentGoal, platform: request.platform, contentType: request.contentType, audience: profile.target_audience }
@@ -807,6 +817,64 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
   }
 
   let normalized = normalizePosts(initialPosts);
+  const drifted = normalized.some((post) => post.why_this_works?.topic_fidelity?.topicMatch === "Drifted");
+  if (drifted) {
+    console.warn("[openai][content-generator][topic-drift-detected]", {
+      requestedTopic: request.topic,
+      generatedFocuses: normalized.map((post) => post.why_this_works?.topic_fidelity?.generatedFocus),
+      matches: normalized.map((post) => post.why_this_works?.topic_fidelity?.topicMatch)
+    });
+    try {
+      const correctedPosts = await runGeneration(`${prompt}
+
+Topic drift correction pass:
+The previous draft drifted away from the requested topic.
+${topicFidelityInstruction(request.topic)}
+Regenerate once. Make the requested topic the unmistakable central subject in the hook, caption, examples, script, and visual idea.
+Mention adjacent concepts only as brief comparisons.
+`);
+      const corrected = normalizePosts(correctedPosts);
+      normalized = corrected.map((post, index) => {
+        const currentMatch = post.why_this_works?.topic_fidelity?.topicMatch;
+        return currentMatch === "Drifted" ? normalized[index] || post : post;
+      });
+    } catch (error) {
+      console.error("[openai][content-generator][topic-drift-regeneration-failed]", {
+        message: safeErrorMessage(error),
+        stackPreview: error instanceof Error ? error.stack?.slice(0, 900) : undefined
+      });
+    }
+  }
+  normalized = normalized.map((post) => {
+    const fidelity = post.why_this_works?.topic_fidelity;
+    if (fidelity?.topicMatch === "Strong") return post;
+    const repair = attachmentTopicRepairCopy(request.topic, request.contentGoal);
+    if (!repair) return post;
+    const repaired = removeEmDashesDeep({
+      ...post,
+      hook: repair.hook,
+      caption: repair.caption,
+      visual_idea: repair.visualIdea,
+      script: request.contentType?.toLowerCase().includes("video") || request.platform?.toLowerCase().includes("tiktok") ? repair.script : post.script || repair.script
+    });
+    const repairedFidelity = assessTopicFidelity({
+      requestedTopic: request.topic,
+      contentAngle: repaired.content_angle,
+      hook: repaired.hook,
+      caption: repaired.caption,
+      visualIdea: repaired.visual_idea,
+      script: repaired.script
+    });
+    return {
+      ...repaired,
+      why_this_works: {
+        ...repaired.why_this_works,
+        topic_fidelity: repairedFidelity,
+        psychological_angle: repaired.why_this_works.psychological_angle || `${repair.focus} attachment-style distinction`,
+        therapist_observation: repaired.why_this_works.therapist_observation || `What I see in therapy: ${repair.focus} has a distinct relational pattern that should not be swapped with another attachment style.`
+      }
+    };
+  });
   return normalized;
 }
 

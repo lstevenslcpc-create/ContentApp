@@ -7,6 +7,7 @@ import type { BrandBrain, BusinessProfile, ContentGenerationRequest, ContentInte
 import { formatCompactBrandBrainForPrompt } from "./brandBrain/format";
 import { formatContentGoalForPrompt } from "./contentGoalConfig";
 import { applyLionHeartVoiceGuidance } from "./lionheartVoiceLibrary";
+import { topicFidelityInstruction } from "./topicFidelity";
 
 function followerGrowthInstructions(request: ContentGenerationRequest) {
   if (request.contentGoal !== "follower-growth") return "";
@@ -180,6 +181,7 @@ Business:
 - Preferred CTA: ${profile.call_to_action || "Contact us today"}
 
 Primary content topic: ${request.topic}
+${topicFidelityInstruction(request.topic)}
 Content goal: ${request.contentGoal}
 ${formatContentGoalForPrompt(request.contentGoal)}
 ${followerGrowthInstructions(request)}
@@ -235,6 +237,11 @@ Content rules:
 - Canva visual directions must follow the Brand Brain visual rules.
 - Let the selected content goal guide the hook style, CTA style, and Canva/template recommendation.
 - Let the primary topic guide the emotional angle, examples, hook wording, SEO language, visual direction, and template recommendation.
+- If the requested topic is a specific attachment style, keep that attachment style central. Do not replace avoidant attachment with anxious attachment, anxious attachment with avoidant attachment, secure attachment with insecure attachment, or disorganized attachment with only anxious or only avoidant attachment.
+- For avoidant attachment, center distancing, shutting down, needing space, discomfort with dependence, minimizing needs, withdrawing, self-reliance as protection, and deactivating strategies.
+- For anxious attachment, center reassurance seeking, fear of abandonment, protest behaviors, over-texting, tone scanning, hypervigilance, and silence feeling like rejection.
+- For secure attachment, center repair, trust, direct communication, emotional safety, boundaries, interdependence, and consistent connection.
+- For disorganized attachment, center push-pull patterns, wanting closeness and fearing it, confusing safety cues, freeze responses, chaotic approach-avoid patterns, and hot-cold relational responses.
 - Include the recommended Canva/template direction inside visual_idea so it can be used during design prep.
 - For follower-growth, keep service or therapy promotion secondary unless the user explicitly selected leads or therapy-inquiries.
 - For follower-growth, captions should feel like a therapist creator naming a familiar emotional pattern, then inviting saves, shares, comments, or follows.

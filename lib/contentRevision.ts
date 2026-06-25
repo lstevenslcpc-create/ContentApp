@@ -1,6 +1,7 @@
 import type { BrandBrain, ContentPack, ContentPackSectionKey, GeneratedContent } from "./types";
 import { formatCompactBrandBrainForPrompt } from "./brandBrain/format";
 import { applyLionHeartVoiceGuidance } from "./lionheartVoiceLibrary";
+import { assessTopicFidelity, attachmentTopicRepairCopy, topicFidelityInstruction } from "./topicFidelity";
 
 export type ContentImproveAction =
   | "regenerate_hook"
@@ -14,7 +15,8 @@ export type ContentImproveAction =
   | "rewrite_instagram"
   | "rewrite_tiktok"
   | "rewrite_pinterest"
-  | "rewrite_carousel";
+  | "rewrite_carousel"
+  | "regenerate_to_match_topic";
 
 export type CanvaSlideImproveAction =
   | "regenerate_slide"
@@ -95,7 +97,8 @@ function actionInstruction(action: ContentImproveAction) {
     rewrite_instagram: "Rewrite for Instagram. Prioritize carousel or caption readability, saves, and comments.",
     rewrite_tiktok: "Rewrite for TikTok or Reels. Make it punchy, spoken, and creator-native.",
     rewrite_pinterest: "Rewrite for Pinterest. Make it searchable, clear, and save-worthy.",
-    rewrite_carousel: "Rewrite as Canva-ready Instagram carousel slide copy with concise slide text."
+    rewrite_carousel: "Rewrite as Canva-ready Instagram carousel slide copy with concise slide text.",
+    regenerate_to_match_topic: "Regenerate the hook, caption, visual idea, and script only as needed so the content matches the requested topic exactly. Keep the same platform, content type, and goal."
   };
   return instructions[action];
 }
@@ -189,12 +192,16 @@ ${applyLionHeartVoiceGuidance({
   contentType: item.content_type
 })}
 
+${topicFidelityInstruction(String(item.topic || ""))}
+
 Current content:
 ${JSON.stringify(current, null, 2)}
 
 Rules:
 - Update only the fields needed for the requested action.
 - Keep the content specific to LionHeart Therapy and the topic.
+- The requested topic is ${item.topic || "the saved topic"}. Do not drift into a related but different topic.
+- For attachment topics, preserve the exact attachment style. Avoidant, anxious, secure, and disorganized attachment are not interchangeable.
 - Avoid generic therapy filler, guru language, and guaranteed outcomes.
 - Avoid em dashes completely.
 - Return JSON only.
@@ -225,6 +232,44 @@ Return this shape:
   if (action === "rewrite_tiktok") updates.platform = "TikTok";
   if (action === "rewrite_pinterest") updates.platform = "Pinterest";
   if (action === "rewrite_carousel") updates.content_type = "carousel";
+
+  if (action === "regenerate_to_match_topic") {
+    let fidelity = assessTopicFidelity({
+      requestedTopic: String(item.topic || ""),
+      contentAngle: item.content_angle,
+      hook: updates.hook || item.hook,
+      caption: updates.caption || item.caption,
+      visualIdea: updates.visual_idea || item.visual_idea,
+      script: updates.script || item.script
+    });
+    if (fidelity.topicMatch !== "Strong") {
+      const repair = attachmentTopicRepairCopy(String(item.topic || ""), String(item.content_goal || ""));
+      if (repair) {
+        updates.hook = repair.hook;
+        updates.caption = repair.caption;
+        updates.visual_idea = repair.visualIdea;
+        updates.script = repair.script;
+        fidelity = assessTopicFidelity({
+          requestedTopic: String(item.topic || ""),
+          contentAngle: item.content_angle,
+          hook: updates.hook,
+          caption: updates.caption,
+          visualIdea: updates.visual_idea,
+          script: updates.script
+        });
+      }
+    }
+    updates.why_this_works = {
+      ...(item.why_this_works || {
+        goal_used: String(item.content_goal || ""),
+        audience_insight: "",
+        psychological_angle: "",
+        cta_strategy: "",
+        suggested_template: ""
+      }),
+      topic_fidelity: fidelity
+    };
+  }
 
   if (!Object.keys(updates).length) {
     throw new Error("The targeted edit did not return any usable content changes.");
