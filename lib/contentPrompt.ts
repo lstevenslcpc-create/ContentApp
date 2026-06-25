@@ -223,6 +223,18 @@ Build the content pack around this brief. Keep each post distinct, but make the 
 ${formatCompactBrandBrainForPrompt(brandBrain)}
 
 Content rules:
+- The LionHeart Voice Library is the primary writing authority. Do not treat it as optional context.
+- The goal is not to teach psychology first. The goal is to make people feel deeply understood, then let education happen naturally through the story.
+- Start with emotional recognition, not explanation. Avoid opening with "Many people", "Did you know", "Anxiety is", "Avoidant attachment is", or "It is important to".
+- Prefer hooks built from unexpected truths, emotional contradictions, specific observations, micro-stories, or perspective shifts.
+- Show the moment before explaining the concept. Describe the behavior, then reveal the psychology underneath.
+- Every post must include at least one recognizable moment, such as editing the text five times, staring at typing bubbles, cleaning instead of having the conversation, pretending you are tired, checking your phone repeatedly, apologizing before asking for a need, laughing while overwhelmed, driving home replaying the conversation, or sitting in the parking lot before walking inside.
+- Replace vague words such as stress, hard, difficult, and challenging with lived experience: stomach drops, chest tightens, mind replays the conversation, suddenly needing space, stopping replies, or convincing yourself reassurance is too much.
+- Every post must include one therapist insight that feels like something a therapist would naturally notice, not a textbook definition.
+- Every post must include one screenshot-worthy sentence that could stand alone.
+- Use spoken rhythm: short lines, natural pauses, paragraph breaks, contrast, and varied sentence length.
+- CTAs should feel like invitations. Prefer questions like "What part felt familiar?", "Have you ever noticed yourself doing this?", "When did you first realize this about yourself?", or "What would you tell the younger version of you?"
+- Avoid generic CTAs like "What do you think?" or "Comment below" unless the wording genuinely fits the post.
 - Make outputs feel deeply customized to ${brandBrain?.brand_name || profile.business_name}, never generic wellness AI.
 - Write from the Content Research + Depth Brief before writing the final post.
 - Include specific symptoms, emotions, body cues, behaviors, myths, real-life examples, and therapist-level insight when relevant.

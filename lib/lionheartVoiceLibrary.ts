@@ -21,6 +21,8 @@ export type LionHeartVoiceScore = {
   genericPhraseWarnings: string[];
 };
 
+export const LIONHEART_MINIMUM_VOICE_SCORE = 72;
+
 export const LIONHEART_VOICE_IDENTITY = [
   "emotionally intelligent",
   "therapist-led",
@@ -164,6 +166,16 @@ export const LIONHEART_CLIENT_STYLE_LINES = [
   "Are we okay?"
 ];
 
+export const LIONHEART_STORYTELLING_RULES = [
+  "Open with a scroll-stopping emotional recognition moment, not a definition.",
+  "Show the moment first. Then reveal the psychology underneath.",
+  "Use micro-stories: rewriting the text, staring at typing bubbles, sitting in the parking lot, replaying the conversation, cleaning instead of talking, or pretending to be tired.",
+  "Make education feel like a therapist noticing the protective logic underneath the behavior.",
+  "Include one screenshot-worthy sentence that could stand alone.",
+  "Use rhythm: short lines, natural pauses, contrast, and paragraph breaks.",
+  "End with an invitation or reflection question, not a generic comment prompt."
+];
+
 const styleTrainingNotes = [
   "Open with one emotionally recognizable truth, not a blog introduction.",
   "Use short lines and controlled repetition when it improves pacing.",
@@ -206,12 +218,14 @@ export function applyLionHeartVoiceGuidance(input: LionHeartVoicePromptInput = {
   const phraseRotation = LIONHEART_PHRASE_PATTERNS.slice(0, 8).join(" | ");
   return `
 LionHeart Voice Library:
+- Primary authority: This LionHeart Voice Library overrides generic educational writing rules. If there is conflict, follow the Voice Library.
 - Voice identity: ${LIONHEART_VOICE_IDENTITY.join(", ")}.
 - Topic voice guidance: ${closestTopicGuidance(topic).join(" ")}
 - Choose one natural phrase pattern when it fits. Rotate them and do not force the same opener every time: ${phraseRotation}
 - Choose one structure: ${LIONHEART_POST_STRUCTURES.join(" | ")}.
+- Storytelling rules: ${LIONHEART_STORYTELLING_RULES.join(" ")}
 - Client-style language may be anonymized and generalized. Never imply a line is a real client quote.
-- Rewrite rules: sound specific; include a real-life detail; teach one useful idea; avoid filler and blog-intro language; use short lines for social content; stay emotionally precise; include therapist perspective when appropriate.
+- Rewrite rules: sound specific; include a real-life detail; teach through story; avoid filler and blog-intro language; use short lines for social content; stay emotionally precise; include therapist perspective when appropriate.
 - Platform: ${input.platform || "social content"}. Content type: ${input.contentType || "post"}. Audience: ${input.audience || "LionHeart Therapy audience"}.
 - CTA direction: ${ctaGuidance(goal)}
 - Forbidden phrases: ${LIONHEART_FORBIDDEN_PHRASES.join(" | ")}.
@@ -231,24 +245,26 @@ function clamp(value: number) {
 export function scoreLionHeartVoice(content: string, input: LionHeartVoicePromptInput = {}): LionHeartVoiceScore {
   const text = normalize(content || "");
   const warnings = LIONHEART_FORBIDDEN_PHRASES.filter((phrase) => text.includes(normalize(phrase)));
-  const specificity = clamp(28 + countMatches(text, [/\bwhen\b/, /\bafter\b/, /\bbefore\b/, /\btext\b/, /\bschool\b/, /\bhome\b/, /\bwork\b/, /\bstomach\b/, /\btone\b/, /\bemail\b/]) * 9);
-  const emotionalResonance = clamp(25 + countMatches(text, [/fear/, /shame/, /overwhelm/, /resent/, /panic/, /guilt/, /lonely/, /exhaust/, /pressure/, /rejection/]) * 8);
-  const therapistInsight = clamp(20 + countMatches(text, [/what i see in therapy/, /as a therapist/, /many people assume/, /what is actually happening/, /nervous system/, /behavior makes more sense/]) * 14);
-  const realLifeExample = clamp(20 + countMatches(text, [/for example/, /this can look like/, /reread/, /rewrite/, /stays? home/, /shuts? down/, /says? yes/, /snaps?/, /checks?/, /avoids?/]) * 12);
+  const specificity = clamp(28 + countMatches(text, [/\bwhen\b/, /\bafter\b/, /\bbefore\b/, /\btext\b/, /\bschool\b/, /\bhome\b/, /\bwork\b/, /\bstomach\b/, /\btone\b/, /\bemail\b/, /\bparking lot\b/, /\btyping bubbles\b/]) * 9);
+  const emotionalResonance = clamp(25 + countMatches(text, [/fear/, /shame/, /overwhelm/, /resent/, /panic/, /guilt/, /lonely/, /exhaust/, /pressure/, /rejection/, /chest tightens/, /stomach drops/, /emotionally expensive/]) * 8);
+  const therapistInsight = clamp(20 + countMatches(text, [/what i see in therapy/, /as a therapist/, /many people assume/, /what is actually happening/, /nervous system/, /behavior makes more sense/, /trying to protect/, /survival strateg/]) * 14);
+  const realLifeExample = clamp(20 + countMatches(text, [/for example/, /this can look like/, /reread/, /rewrite/, /stays? home/, /shuts? down/, /says? yes/, /snaps?/, /checks?/, /avoids?/, /typing bubbles/, /parking lot/, /replaying the conversation/, /delete it/]) * 12);
   const averageSentenceLength = text.split(/[.!?\n]+/).map((sentence) => sentence.trim().split(/\s+/).filter(Boolean).length).filter(Boolean);
   const averageWords = averageSentenceLength.length ? averageSentenceLength.reduce((sum, value) => sum + value, 0) / averageSentenceLength.length : 30;
   const socialNativeReadability = clamp(100 - Math.max(0, averageWords - 14) * 4 + (content.includes("\n") ? 8 : 0));
   const brandFit = clamp((specificity + emotionalResonance + therapistInsight + realLifeExample + socialNativeReadability) / 5 - warnings.length * 12);
   const goal = normalize(String(input.goal || ""));
   const ctaFit = clamp(45 + (goal === "saves" && /save|script|checklist|remember/.test(text) ? 35 : 0) + (["follower-growth", "shares", "engagement"].includes(goal) && /follow|send|share|comment/.test(text) ? 35 : 0) + (["leads", "therapy-inquiries"].includes(goal) && /therapy|support|work with/.test(text) ? 30 : 0));
-  const genericLanguageRisk = clamp(warnings.length * 22 + countMatches(text, [/many people struggle/, /in today's world/, /it is important to/, /remember that/, /prioritize your well-being/]) * 18);
-  const score = clamp((specificity + emotionalResonance + therapistInsight + realLifeExample + socialNativeReadability + brandFit + ctaFit + (100 - genericLanguageRisk)) / 8);
+  const storytelling = clamp(25 + countMatches(text, [/you /, /what they don't see/, /what they do not see/, /you didn't/, /you did not/, /sometimes/, /actually means/, /trying not to/, /before you/]) * 8 + (content.includes("\n\n") ? 12 : 0));
+  const genericLanguageRisk = clamp(warnings.length * 22 + countMatches(text, [/many people struggle/, /did you know/, /in today's world/, /it is important to/, /remember that/, /prioritize your well-being/, /anxiety is/, /avoidant attachment is/]) * 18);
+  const score = clamp((specificity + emotionalResonance + therapistInsight + realLifeExample + socialNativeReadability + brandFit + ctaFit + storytelling + (100 - genericLanguageRisk)) / 9);
   const strengths: string[] = [];
   const improvements: string[] = [];
   if (specificity >= 70) strengths.push("Uses specific, recognizable moments."); else improvements.push("Add one concrete behavior, thought, body cue, or daily-life moment.");
   if (therapistInsight >= 70) strengths.push("Includes a clear therapist perspective."); else improvements.push("Add a therapist observation that explains what is happening underneath.");
   if (emotionalResonance >= 70) strengths.push("Names the emotion underneath the behavior."); else improvements.push("Name the hidden fear, shame, pressure, grief, or need more precisely.");
   if (socialNativeReadability >= 70) strengths.push("Reads naturally for social media."); else improvements.push("Shorten sentences and remove blog-style setup.");
+  if (storytelling >= 70) strengths.push("Uses story-first rhythm and emotional contrast."); else improvements.push("Show the moment first, then reveal what is happening underneath.");
   if (ctaFit < 65) improvements.push(`Make the CTA more specific to ${input.goal || "the selected goal"}.`);
   return { score, specificity, emotionalResonance, therapistInsight, realLifeExample, socialNativeReadability, brandFit, ctaFit, genericLanguageRisk, strengths, improvements, genericPhraseWarnings: warnings };
 }

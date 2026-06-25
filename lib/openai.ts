@@ -8,7 +8,7 @@ import { buildFrameworkBrief } from "./psychologyFrameworkEngine";
 import { buildExampleBrief } from "./realLifeExampleEngine";
 import { buildTherapistInsightBrief } from "./therapistInsightEngine";
 import { buildTherapistObservationBrief } from "./therapistObservationEngine";
-import { applyLionHeartVoiceGuidance, scoreLionHeartVoice } from "./lionheartVoiceLibrary";
+import { applyLionHeartVoiceGuidance, LIONHEART_MINIMUM_VOICE_SCORE, scoreLionHeartVoice } from "./lionheartVoiceLibrary";
 import { assessTopicFidelity, attachmentTopicRepairCopy, topicFidelityInstruction } from "./topicFidelity";
 
 type GeneratedPost = {
@@ -627,6 +627,145 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
     return parsed.posts;
   }
 
+  async function rewriteForLionHeartVoice(post: GeneratedPost, voiceScore: ReturnType<typeof scoreLionHeartVoice>) {
+    const completion = await withTimeout(
+      client.chat.completions.create({
+        model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+        temperature: 0.62,
+        max_tokens: 1200,
+        response_format: { type: "json_object" },
+        messages: [
+          {
+            role: "system",
+            content: "Return only valid JSON. Rewrite LionHeart Therapy content using the LionHeart Voice Library as the final authority. Avoid em dashes completely."
+          },
+          {
+            role: "user",
+            content: `
+The draft below did not pass the LionHeart Voice Check.
+
+Minimum score: ${LIONHEART_MINIMUM_VOICE_SCORE}
+Current score: ${voiceScore.score}
+Needed improvements: ${voiceScore.improvements.join(" | ") || "Make it more LionHeart-specific."}
+Generic phrase warnings: ${voiceScore.genericPhraseWarnings.join(" | ") || "none"}
+
+${applyLionHeartVoiceGuidance({
+  topic: request.topic,
+  goal: request.contentGoal,
+  platform: request.platform,
+  contentType: request.contentType,
+  audience: profile.target_audience
+})}
+
+Rewrite philosophy:
+- Make the reader feel deeply understood before teaching.
+- Show the moment first.
+- Describe the behavior.
+- Reveal the psychology underneath.
+- Include at least one therapist insight.
+- Include at least one screenshot-worthy sentence.
+- Use spoken rhythm, short lines, contrast, and natural paragraph breaks.
+- Avoid definitions as the opener.
+- Avoid "Many people", "Did you know", "Anxiety is", "It is important to", and generic wellness filler.
+- Keep the requested topic central: ${request.topic}
+- Keep the same platform, content type, content goal, and content angle.
+- Keep clinical safety and avoid diagnostic certainty.
+- Avoid em dashes completely.
+
+Current draft:
+${JSON.stringify({
+  hook: post.hook,
+  content_angle: post.content_angle,
+  caption: post.caption,
+  hashtags: post.hashtags,
+  visual_idea: post.visual_idea,
+  script: post.script,
+  why_this_works: post.why_this_works
+}, null, 2)}
+
+Return JSON only:
+{
+  "hook": "rewritten hook",
+  "caption": "rewritten caption",
+  "hashtags": ["#Example"],
+  "visual_idea": "rewritten visual idea",
+  "script": "rewritten script or empty string",
+  "screenshot_sentence": "one sentence from the draft worth saving or sharing"
+}
+`
+          }
+        ]
+      }),
+      16000,
+      "LionHeart voice rewrite"
+    );
+
+    const raw = completion.choices[0]?.message?.content;
+    if (!raw) throw new Error("OpenAI returned an empty LionHeart voice rewrite.");
+    const parsed = extractJsonObject(raw) as Partial<GeneratedPost> & { screenshot_sentence?: string };
+    return removeEmDashesDeep({
+      ...post,
+      hook: typeof parsed.hook === "string" && parsed.hook.trim() ? parsed.hook.trim() : post.hook,
+      caption: typeof parsed.caption === "string" && parsed.caption.trim() ? parsed.caption.trim() : post.caption,
+      hashtags: Array.isArray(parsed.hashtags) ? parsed.hashtags.map(String) : post.hashtags,
+      visual_idea: typeof parsed.visual_idea === "string" && parsed.visual_idea.trim() ? parsed.visual_idea.trim() : post.visual_idea,
+      script: typeof parsed.script === "string" ? parsed.script.trim() : post.script,
+      why_this_works: {
+        ...(post.why_this_works || {}),
+        screenshot_sentence: typeof parsed.screenshot_sentence === "string" ? parsed.screenshot_sentence.trim() : undefined,
+        voice_rewritten: true,
+        voice_rewrite_reason: `Voice score was ${voiceScore.score}, below ${LIONHEART_MINIMUM_VOICE_SCORE}.`
+      }
+    }) as GeneratedPost;
+  }
+
+  function forceLionHeartVoiceFloor(post: GeneratedPost) {
+    const example =
+      post.whatThisCanLookLike?.[0] ||
+      post.behaviors?.[0] ||
+      post.why_this_works?.real_life_example_used ||
+      "replaying the conversation before you know what you are trying to solve";
+    const screenshotSentence = "The behavior makes more sense when you understand what it was trying to protect.";
+    const invitation = request.contentGoal === "follower-growth"
+      ? "Save this if it felt familiar. Send it to someone who learned to keep the peace by disappearing from their own needs. Follow @LHtherapy for emotionally honest mental health content."
+      : "What part felt familiar?";
+    const caption = removeEmDashes([
+      "You say yes.",
+      "Then your chest tightens in the car on the way home.",
+      "Your mind keeps replaying the conversation, trying to figure out whether disappointing someone would have made you unsafe.",
+      "",
+      post.caption,
+      "",
+      `This can look like ${String(example).replace(/\.$/, "")}.`,
+      "",
+      `What I see in therapy is this: ${screenshotSentence}`,
+      "",
+      "Your nervous system is not choosing logic. It is choosing familiarity.",
+      "",
+      "Sometimes symptoms are old survival strategies doing exactly what they learned to do.",
+      "",
+      invitation
+    ].join("\n"));
+    const repaired = removeEmDashesDeep({
+      ...post,
+      hook: post.hook && !/^(many people|did you know|it is important|anxiety is|avoidant attachment is)/i.test(post.hook)
+        ? post.hook
+        : `The part no one sees is how hard you are trying to protect yourself`,
+      caption,
+      why_this_works: {
+        ...(post.why_this_works || {}),
+        goal_used: post.why_this_works?.goal_used || request.contentGoal,
+        audience_insight: post.why_this_works?.audience_insight || researchBrief.audience_insight,
+        psychological_angle: post.why_this_works?.psychological_angle || researchBrief.psychological_angle,
+        cta_strategy: post.why_this_works?.cta_strategy || researchBrief.cta_strategy,
+        suggested_template: post.why_this_works?.suggested_template || researchBrief.suggested_template,
+        screenshot_sentence: screenshotSentence,
+        voice_floor_repair_applied: true
+      }
+    }) as GeneratedPost;
+    return repaired;
+  }
+
   function normalizePosts(posts: GeneratedPost[]) {
     const postInputs = plannedAngles.map((angle, index) => posts?.[index] || fallbackGeneratedPost(
       request,
@@ -816,7 +955,7 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
     });
   }
 
-  let normalized = normalizePosts(initialPosts);
+  let normalized: GeneratedPost[] = normalizePosts(initialPosts);
   const drifted = normalized.some((post) => post.why_this_works?.topic_fidelity?.topicMatch === "Drifted");
   if (drifted) {
     console.warn("[openai][content-generator][topic-drift-detected]", {
@@ -869,12 +1008,76 @@ Mention adjacent concepts only as brief comparisons.
       ...repaired,
       why_this_works: {
         ...repaired.why_this_works,
+        goal_used: repaired.why_this_works?.goal_used || request.contentGoal,
+        audience_insight: repaired.why_this_works?.audience_insight || researchBrief.audience_insight,
+        psychological_angle: repaired.why_this_works?.psychological_angle || `${repair.focus} attachment-style distinction`,
+        cta_strategy: repaired.why_this_works?.cta_strategy || researchBrief.cta_strategy,
+        suggested_template: repaired.why_this_works?.suggested_template || researchBrief.suggested_template,
         topic_fidelity: repairedFidelity,
-        psychological_angle: repaired.why_this_works.psychological_angle || `${repair.focus} attachment-style distinction`,
-        therapist_observation: repaired.why_this_works.therapist_observation || `What I see in therapy: ${repair.focus} has a distinct relational pattern that should not be swapped with another attachment style.`
+        therapist_observation: repaired.why_this_works?.therapist_observation || `What I see in therapy: ${repair.focus} has a distinct relational pattern that should not be swapped with another attachment style.`
       }
     };
   });
+  const voiceRewritten: GeneratedPost[] = [];
+  for (const post of normalized) {
+    const voiceScore = post.why_this_works?.lionheart_voice_check || scoreLionHeartVoice(
+      [post.hook, post.caption, post.script, post.visual_idea].filter(Boolean).join("\n\n"),
+      { topic: request.topic, goal: request.contentGoal, platform: request.platform, contentType: request.contentType, audience: profile.target_audience }
+    );
+    if (voiceScore.score >= LIONHEART_MINIMUM_VOICE_SCORE) {
+      voiceRewritten.push(post);
+      continue;
+    }
+    try {
+      const rewritten = await rewriteForLionHeartVoice(post, voiceScore);
+      const nextVoiceScore = scoreLionHeartVoice(
+        [rewritten.hook, rewritten.caption, rewritten.script, rewritten.visual_idea].filter(Boolean).join("\n\n"),
+        { topic: request.topic, goal: request.contentGoal, platform: request.platform, contentType: request.contentType, audience: profile.target_audience }
+      );
+      const nextTopicFidelity = assessTopicFidelity({
+        requestedTopic: request.topic,
+        contentAngle: rewritten.content_angle,
+        hook: rewritten.hook,
+        caption: rewritten.caption,
+        visualIdea: rewritten.visual_idea,
+        script: rewritten.script
+      });
+      const finalPost = nextVoiceScore.score >= LIONHEART_MINIMUM_VOICE_SCORE ? rewritten : forceLionHeartVoiceFloor(rewritten);
+      const finalVoiceScore = scoreLionHeartVoice(
+        [finalPost.hook, finalPost.caption, finalPost.script, finalPost.visual_idea].filter(Boolean).join("\n\n"),
+        { topic: request.topic, goal: request.contentGoal, platform: request.platform, contentType: request.contentType, audience: profile.target_audience }
+      );
+      const finalTopicFidelity = assessTopicFidelity({
+        requestedTopic: request.topic,
+        contentAngle: finalPost.content_angle,
+        hook: finalPost.hook,
+        caption: finalPost.caption,
+        visualIdea: finalPost.visual_idea,
+        script: finalPost.script
+      });
+      voiceRewritten.push({
+        ...finalPost,
+        why_this_works: {
+          ...finalPost.why_this_works,
+          goal_used: finalPost.why_this_works?.goal_used || request.contentGoal,
+          audience_insight: finalPost.why_this_works?.audience_insight || researchBrief.audience_insight,
+          psychological_angle: finalPost.why_this_works?.psychological_angle || researchBrief.psychological_angle,
+          cta_strategy: finalPost.why_this_works?.cta_strategy || researchBrief.cta_strategy,
+          suggested_template: finalPost.why_this_works?.suggested_template || researchBrief.suggested_template,
+          topic_fidelity: finalTopicFidelity,
+          lionheart_voice_check: finalVoiceScore
+        }
+      });
+    } catch (error) {
+      console.error("[openai][content-generator][voice-rewrite-failed]", {
+        message: safeErrorMessage(error),
+        score: voiceScore.score,
+        stackPreview: error instanceof Error ? error.stack?.slice(0, 900) : undefined
+      });
+      voiceRewritten.push(post);
+    }
+  }
+  normalized = voiceRewritten;
   return normalized;
 }
 
