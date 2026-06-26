@@ -154,6 +154,8 @@ create table if not exists gold_standard_examples (
   cta text,
   tags text[] default '{}',
   collection text,
+  story_framework text,
+  emotional_destination text,
   why_gold_standard text,
   notes text,
   status text default 'approved',
@@ -177,6 +179,46 @@ on gold_standard_examples(user_id, content_type);
 
 create index if not exists gold_standard_examples_tags_idx
 on gold_standard_examples using gin(tags);
+
+create table if not exists story_frameworks (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  framework_name text not null,
+  purpose text,
+  when_to_use text,
+  best_platforms text[] default '{}',
+  best_content_types text[] default '{}',
+  writing_rhythm text,
+  psychological_goal text,
+  emotional_destination text,
+  typical_hook_styles text[] default '{}',
+  paragraph_rhythm text,
+  sentence_rhythm text,
+  education_level integer,
+  emotion_level integer,
+  curiosity_level integer,
+  story_level integer,
+  therapist_insight_level integer,
+  saveability_score integer,
+  shareability_score integer,
+  example_gold_standard_posts text[] default '{}',
+  status text default 'active',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  constraint story_frameworks_status_check check (status in ('active', 'archived'))
+);
+
+alter table gold_standard_examples add column if not exists story_framework text;
+alter table gold_standard_examples add column if not exists emotional_destination text;
+
+create index if not exists story_frameworks_user_idx
+on story_frameworks(user_id);
+
+create index if not exists story_frameworks_user_status_idx
+on story_frameworks(user_id, status);
+
+create index if not exists story_frameworks_name_idx
+on story_frameworks(framework_name);
 
 create table if not exists content_packs (
   id uuid primary key default gen_random_uuid(),
@@ -497,6 +539,11 @@ create trigger gold_standard_examples_updated_at
 before update on gold_standard_examples
 for each row execute procedure set_updated_at();
 
+drop trigger if exists story_frameworks_updated_at on story_frameworks;
+create trigger story_frameworks_updated_at
+before update on story_frameworks
+for each row execute procedure set_updated_at();
+
 drop trigger if exists content_packs_updated_at on content_packs;
 create trigger content_packs_updated_at
 before update on content_packs
@@ -528,6 +575,7 @@ alter table generated_content enable row level security;
 alter table content_opportunities enable row level security;
 alter table media_library enable row level security;
 alter table gold_standard_examples enable row level security;
+alter table story_frameworks enable row level security;
 alter table content_packs enable row level security;
 alter table canva_templates enable row level security;
 alter table content_calendar_plans enable row level security;
@@ -569,6 +617,12 @@ with check (auth.uid() = user_id);
 drop policy if exists "Users can manage their gold standard examples" on gold_standard_examples;
 create policy "Users can manage their gold standard examples"
 on gold_standard_examples for all
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+drop policy if exists "Users can manage their story frameworks" on story_frameworks;
+create policy "Users can manage their story frameworks"
+on story_frameworks for all
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
 

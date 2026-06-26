@@ -8,6 +8,7 @@ import { formatCompactBrandBrainForPrompt } from "./brandBrain/format";
 import { formatContentGoalForPrompt } from "./contentGoalConfig";
 import { formatGoldStandardExamplesForPrompt } from "./goldStandardLibrary";
 import { applyLionHeartVoiceGuidance } from "./lionheartVoiceLibrary";
+import { formatStoryFrameworkForPrompt, selectStoryFramework } from "./storyFrameworks";
 import { topicFidelityInstruction } from "./topicFidelity";
 
 function followerGrowthInstructions(request: ContentGenerationRequest) {
@@ -166,7 +167,7 @@ Every post must include at least one authentic therapist observation from its as
 `;
 }
 
-export function buildContentPrompt(profile: BusinessProfile, request: ContentGenerationRequest, brandBrain?: BrandBrain | null, researchBrief?: ContentIntelligenceBrief | null, plannedAngles: ContentAngle[] = [], frameworkBriefs: FrameworkBrief[] = [], exampleBriefs: ExampleBrief[] = [], therapistInsightBriefs: TherapistInsightBrief[] = [], therapistObservationBriefs: TherapistObservationBrief[] = [], goldStandardExamples: GoldStandardExample[] = []) {
+export function buildContentPrompt(profile: BusinessProfile, request: ContentGenerationRequest, brandBrain?: BrandBrain | null, researchBrief?: ContentIntelligenceBrief | null, plannedAngles: ContentAngle[] = [], frameworkBriefs: FrameworkBrief[] = [], exampleBriefs: ExampleBrief[] = [], therapistInsightBriefs: TherapistInsightBrief[] = [], therapistObservationBriefs: TherapistObservationBrief[] = [], goldStandardExamples: GoldStandardExample[] = [], storyFrameworkSelection?: ReturnType<typeof selectStoryFramework>) {
   return `
 You are an expert small-business content strategist. Generate ${request.numberOfPosts} ready-to-review ${request.contentType} idea(s) for ${request.platform}.
 
@@ -225,6 +226,8 @@ ${formatCompactBrandBrainForPrompt(brandBrain)}
 
 ${formatGoldStandardExamplesForPrompt(goldStandardExamples)}
 
+${storyFrameworkSelection ? formatStoryFrameworkForPrompt(storyFrameworkSelection) : ""}
+
 Content rules:
 - The LionHeart Voice Library is the primary writing authority. Do not treat it as optional context.
 - The goal is not to teach psychology first. The goal is to make people feel deeply understood, then let education happen naturally through the story.
@@ -280,6 +283,8 @@ Content rules:
 - Do not use the assigned "what not to say" language except to explain that it is unhelpful. Prefer "what to try instead" scripts when a practical phrase fits.
 - Avoid promotional language unless the goal is leads, therapy-inquiries, product-sales, promotion, or email-list-growth.
 - Avoid generic AI phrases including "unlock your potential", "healing journey", "just breathe", "you are enough", "mental health matters", "discover practical tools", and "nurture secure relationships".
+- Before writing, follow the Story Framework Engine metadata. Choose one primary framework, one supporting framework, one emotional destination, and one platform strategy. The final content should be structured by that framework, not just decorated with it.
+- Write backwards from the emotional destination so the reader feels that destination by the end.
 
 Return strict JSON only with this shape:
 {

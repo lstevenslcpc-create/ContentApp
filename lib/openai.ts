@@ -10,6 +10,7 @@ import { buildTherapistInsightBrief } from "./therapistInsightEngine";
 import { buildTherapistObservationBrief } from "./therapistObservationEngine";
 import { applyLionHeartVoiceGuidance, LIONHEART_MINIMUM_VOICE_SCORE, scoreLionHeartVoice } from "./lionheartVoiceLibrary";
 import { buildLionHeartEditorialPrompt, enforceEditorialBasics, scoreLionHeartEditorialDraft } from "./lionheartEditorialEngine";
+import { selectStoryFramework } from "./storyFrameworks";
 import { assessTopicFidelity, attachmentTopicRepairCopy, generalTopicRepairCopy, topicFidelityInstruction } from "./topicFidelity";
 
 type GeneratedPost = {
@@ -584,7 +585,7 @@ function qualityChecklist(post: GeneratedPost, request: ContentGenerationRequest
   };
 }
 
-export async function generateStructuredContent(profile: BusinessProfile, request: ContentGenerationRequest, brandBrain?: BrandBrain | null, plannedAnglesOverride?: ContentAngle[], goldStandardExamples: import("./types").GoldStandardExample[] = []): Promise<GeneratedPost[]> {
+export async function generateStructuredContent(profile: BusinessProfile, request: ContentGenerationRequest, brandBrain?: BrandBrain | null, plannedAnglesOverride?: ContentAngle[], goldStandardExamples: import("./types").GoldStandardExample[] = [], storyFrameworks: import("./types").StoryFramework[] = []): Promise<GeneratedPost[]> {
   if (!process.env.OPENAI_API_KEY) {
     throw new Error("OPENAI_API_KEY is missing. Add it to generate content.");
   }
@@ -597,7 +598,22 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
   const exampleBriefs = plannedAngles.map((angle) => buildExampleBrief(request.topic, angle.name, request.contentGoal));
   const therapistInsightBriefs = plannedAngles.map((angle) => buildTherapistInsightBrief(request.topic, angle.name, request.contentGoal));
   const therapistObservationBriefs = plannedAngles.map((angle) => buildTherapistObservationBrief(request.topic, angle.name, request.contentGoal));
-  const prompt = buildContentPrompt(profile, request, brandBrain, researchBrief, plannedAngles, frameworkBriefs, exampleBriefs, therapistInsightBriefs, therapistObservationBriefs, goldStandardExamples);
+  const storyFrameworkSelection = selectStoryFramework({
+    topic: request.topic,
+    goal: request.contentGoal,
+    platform: request.platform,
+    contentType: request.contentType,
+    frameworks: storyFrameworks,
+    goldExamples: goldStandardExamples
+  });
+  const storyFrameworkMetadata = {
+    primary: storyFrameworkSelection.primary.framework_name,
+    supporting: storyFrameworkSelection.supporting.framework_name,
+    emotionalDestination: storyFrameworkSelection.emotionalDestination,
+    platformStrategy: storyFrameworkSelection.platformStrategy,
+    frameworkConfidence: storyFrameworkSelection.frameworkConfidence
+  };
+  const prompt = buildContentPrompt(profile, request, brandBrain, researchBrief, plannedAngles, frameworkBriefs, exampleBriefs, therapistInsightBriefs, therapistObservationBriefs, goldStandardExamples, storyFrameworkSelection);
   const client = await createOpenAiClient(process.env.OPENAI_API_KEY);
 
   async function runGeneration(userPrompt: string) {
@@ -836,6 +852,7 @@ Return JSON only:
           psychological_angle: `${attachmentRepair.focus} attachment-style distinction`,
           cta_strategy: post.why_this_works?.cta_strategy || researchBrief.cta_strategy,
           suggested_template: post.why_this_works?.suggested_template || researchBrief.suggested_template,
+          story_framework: post.why_this_works?.story_framework || storyFrameworkMetadata,
           screenshot_sentence: "The behavior makes more sense when you understand what it was trying to protect.",
           voice_floor_repair_applied: true
         }
@@ -881,6 +898,7 @@ Return JSON only:
         psychological_angle: post.why_this_works?.psychological_angle || researchBrief.psychological_angle,
         cta_strategy: post.why_this_works?.cta_strategy || researchBrief.cta_strategy,
         suggested_template: post.why_this_works?.suggested_template || researchBrief.suggested_template,
+        story_framework: post.why_this_works?.story_framework || storyFrameworkMetadata,
         screenshot_sentence: screenshotSentence,
         voice_floor_repair_applied: true
       }
@@ -1006,6 +1024,7 @@ Return JSON only:
         psychological_angle: String(whyThisWorks.psychological_angle || researchBrief.psychological_angle),
         cta_strategy: String(whyThisWorks.cta_strategy || researchBrief.cta_strategy),
         suggested_template: String(whyThisWorks.suggested_template || researchBrief.suggested_template),
+        story_framework: whyThisWorks.story_framework || storyFrameworkMetadata,
         selected_framework: String(whyThisWorks.selected_framework || selectedFramework),
         framework_explanation: String(whyThisWorks.framework_explanation || frameworkExplanation),
         practical_application: String(whyThisWorks.practical_application || practicalApplication),
@@ -1186,6 +1205,7 @@ Mention adjacent concepts only as brief comparisons.
           psychological_angle: finalPost.why_this_works?.psychological_angle || researchBrief.psychological_angle,
           cta_strategy: finalPost.why_this_works?.cta_strategy || researchBrief.cta_strategy,
           suggested_template: finalPost.why_this_works?.suggested_template || researchBrief.suggested_template,
+          story_framework: finalPost.why_this_works?.story_framework || storyFrameworkMetadata,
           topic_fidelity: finalTopicFidelity,
           lionheart_voice_check: finalVoiceScore
         }
@@ -1324,6 +1344,7 @@ Mention adjacent concepts only as brief comparisons.
         psychological_angle: outputPost.why_this_works?.psychological_angle || researchBrief.psychological_angle,
         cta_strategy: outputPost.why_this_works?.cta_strategy || researchBrief.cta_strategy,
         suggested_template: outputPost.why_this_works?.suggested_template || researchBrief.suggested_template,
+        story_framework: outputPost.why_this_works?.story_framework || storyFrameworkMetadata,
         topic_fidelity: outputTopicFidelity,
         lionheart_voice_check: outputEditorialScore.voice,
         editorial_intelligence_score: outputEditorialScore,

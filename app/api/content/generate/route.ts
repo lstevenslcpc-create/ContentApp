@@ -4,7 +4,7 @@ import { selectAnglesForGeneration } from "@/lib/contentAngles";
 import { getRelevantGoldStandardExamples } from "@/lib/goldStandardLibrary";
 import { generateStructuredContent } from "@/lib/openai";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
-import type { BusinessProfile, BrandBrain, ContentGenerationRequest } from "@/lib/types";
+import type { BusinessProfile, BrandBrain, ContentGenerationRequest, StoryFramework } from "@/lib/types";
 
 const MAX_BATCH_SIZE = 2;
 
@@ -72,7 +72,22 @@ async function generateAndSaveBatch({
     titles: goldStandardExamples.map((example) => example.title)
   });
 
-  const posts = await generateStructuredContent(profile, { ...body, topic, numberOfPosts, angleOffset }, brandBrain, plannedAngles, goldStandardExamples);
+  let storyFrameworks: StoryFramework[] = [];
+  const { data: frameworkData, error: frameworkError } = await supabase
+    .from("story_frameworks")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("status", "active");
+  if (frameworkError) {
+    console.warn("[content-generate][story-frameworks-skipped]", {
+      message: frameworkError.message,
+      code: frameworkError.code
+    });
+  } else {
+    storyFrameworks = frameworkData || [];
+  }
+
+  const posts = await generateStructuredContent(profile, { ...body, topic, numberOfPosts, angleOffset }, brandBrain, plannedAngles, goldStandardExamples, storyFrameworks);
   console.info("[content-generate][batch-generated]", {
     topic,
     numberOfPosts,

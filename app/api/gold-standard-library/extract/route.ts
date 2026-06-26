@@ -17,8 +17,10 @@ function fallbackExtract(raw: string) {
     full_content: raw,
     cta,
     tags: [],
-    collection: "",
-    why_gold_standard: "Imported as a strong LionHeart-style reference. Review and edit before saving.",
+      collection: "",
+      story_framework: "",
+      emotional_destination: "",
+      why_gold_standard: "Imported as a strong LionHeart-style reference. Review and edit before saving.",
     notes: ""
   };
 }
@@ -60,6 +62,8 @@ Return JSON:
       "cta": "",
       "tags": ["tag"],
       "collection": "",
+      "story_framework": "",
+      "emotional_destination": "",
       "why_gold_standard": "",
       "notes": ""
     }

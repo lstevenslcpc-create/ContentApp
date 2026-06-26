@@ -25,6 +25,8 @@ function payload(body: Partial<GoldStandardExample>, userId: string) {
     cta: body.cta || null,
     tags: asStringArray(body.tags),
     collection: body.collection || null,
+    story_framework: body.story_framework || null,
+    emotional_destination: body.emotional_destination || null,
     why_gold_standard: body.why_gold_standard || null,
     notes: body.notes || null,
     status: body.status || "approved",

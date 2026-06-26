@@ -15,7 +15,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const { id } = await params;
     const body = (await request.json()) as Partial<GoldStandardExample>;
     const updates: Record<string, unknown> = {};
-    for (const key of ["title", "platform", "topic", "subtopic", "audience", "content_type", "hook", "full_content", "cta", "collection", "why_gold_standard", "notes", "status", "metadata"]) {
+    for (const key of ["title", "platform", "topic", "subtopic", "audience", "content_type", "hook", "full_content", "cta", "collection", "story_framework", "emotional_destination", "why_gold_standard", "notes", "status", "metadata"]) {
       if (key in body) updates[key] = (body as Record<string, unknown>)[key];
     }
     if ("tags" in body) updates.tags = asStringArray(body.tags);

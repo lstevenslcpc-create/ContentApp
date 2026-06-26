@@ -209,6 +209,18 @@ export function ContentCard({ item, onUpdate, onRemove }: { item: GeneratedConte
               <dt className="text-xs font-bold uppercase tracking-wide text-[#8a7143]">Suggested template</dt>
               <dd className="mt-1 leading-6">{whyThisWorks.suggested_template}</dd>
             </div>
+            {whyThisWorks.story_framework && (
+              <div className="sm:col-span-2 rounded-xl border border-[#d8c28a] bg-white p-4">
+                <dt className="text-xs font-bold uppercase tracking-wide text-[#8a7143]">Framework Used</dt>
+                <dd className="mt-3 grid gap-2 text-sm leading-6 sm:grid-cols-2">
+                  <span><strong>Primary:</strong> {whyThisWorks.story_framework.primary}</span>
+                  <span><strong>Supporting:</strong> {whyThisWorks.story_framework.supporting}</span>
+                  <span><strong>Emotional Destination:</strong> {whyThisWorks.story_framework.emotionalDestination}</span>
+                  <span><strong>Framework Confidence:</strong> {whyThisWorks.story_framework.frameworkConfidence}%</span>
+                  <span className="sm:col-span-2"><strong>Platform Strategy:</strong> {whyThisWorks.story_framework.platformStrategy}</span>
+                </dd>
+              </div>
+            )}
             {item.content_angle && (
               <div>
                 <dt className="text-xs font-bold uppercase tracking-wide text-[#8a7143]">Selected angle</dt>

@@ -215,6 +215,13 @@ export type ContentWhyThisWorks = {
   therapist_observation?: string;
   therapist_reframe?: string;
   real_life_example_used?: string;
+  story_framework?: {
+    primary: string;
+    supporting: string;
+    emotionalDestination: string;
+    platformStrategy: string;
+    frameworkConfidence: number;
+  };
   lionheart_voice_check?: {
     score: number;
     specificity: number;
@@ -519,10 +526,39 @@ export type GoldStandardExample = {
   cta?: string | null;
   tags?: string[];
   collection?: string | null;
+  story_framework?: string | null;
+  emotional_destination?: string | null;
   why_gold_standard?: string | null;
   notes?: string | null;
   status?: "draft" | "approved" | "archived";
   metadata?: Record<string, unknown>;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type StoryFramework = {
+  id: string;
+  user_id?: string | null;
+  framework_name: string;
+  purpose?: string | null;
+  when_to_use?: string | null;
+  best_platforms?: string[];
+  best_content_types?: string[];
+  writing_rhythm?: string | null;
+  psychological_goal?: string | null;
+  emotional_destination?: string | null;
+  typical_hook_styles?: string[];
+  paragraph_rhythm?: string | null;
+  sentence_rhythm?: string | null;
+  education_level?: number | null;
+  emotion_level?: number | null;
+  curiosity_level?: number | null;
+  story_level?: number | null;
+  therapist_insight_level?: number | null;
+  saveability_score?: number | null;
+  shareability_score?: number | null;
+  example_gold_standard_posts?: string[];
+  status?: "active" | "archived";
   created_at?: string;
   updated_at?: string;
 };

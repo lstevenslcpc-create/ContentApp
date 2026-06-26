@@ -25,6 +25,8 @@ const emptyDraft = (): DraftEntry => ({
   cta: "",
   tags: [],
   collection: "LionHeart Voice Examples",
+  story_framework: "",
+  emotional_destination: "",
   why_gold_standard: "",
   notes: "",
   status: "approved",
@@ -95,6 +97,8 @@ function normalizeDraft(input: Record<string, unknown> | Partial<GoldStandardExa
     cta: String(record.cta || "").trim(),
     tags: Array.isArray(record.tags) ? record.tags.map(String).filter(Boolean) : String(record.tags || "").split(/[;,]/).map((tag) => tag.trim()).filter(Boolean),
     collection: String(record.collection || "LionHeart Voice Examples").trim(),
+    story_framework: String(record.story_framework || record.storyFramework || "").trim(),
+    emotional_destination: String(record.emotional_destination || record.emotionalDestination || "").trim(),
     why_gold_standard: String(record.why_gold_standard || record.whyGoldStandard || "Strong LionHeart-style example. Review before saving.").trim(),
     notes: String(record.notes || "").trim(),
     approvedForImport: true,
@@ -421,6 +425,8 @@ function DraftCard({ draft, index, onUpdate, onRemove, onDuplicate }: { draft: D
         <Field label="CTA" value={draft.cta || ""} onChange={(value) => onUpdate({ cta: value })} />
         <Field label="Tags" value={(draft.tags || []).join(", ")} onChange={(value) => onUpdate({ tags: value.split(",").map((tag) => tag.trim()).filter(Boolean) })} />
         <Field label="Collection" value={draft.collection || ""} onChange={(value) => onUpdate({ collection: value })} />
+        <Field label="Story Framework" value={draft.story_framework || ""} onChange={(value) => onUpdate({ story_framework: value })} />
+        <Field label="Emotional Destination" value={draft.emotional_destination || ""} onChange={(value) => onUpdate({ emotional_destination: value })} />
       </div>
       <label className="mt-3 block text-sm font-bold text-[#172a3a]">Full content</label>
       <textarea className="field mt-1 min-h-[170px] border-[#e6ddcf] bg-white" value={draft.full_content || ""} onChange={(event) => onUpdate({ full_content: event.target.value })} />
@@ -454,6 +460,10 @@ function ExampleCard({ example, onChange }: { example: GoldStandardExample; onCh
       </div>
       <h3 className="mt-3 text-lg font-bold text-[#172a3a]">{example.title}</h3>
       <p className="mt-2 text-sm font-semibold text-[#7b7468]">{example.topic || "No topic"} · {example.collection || "No collection"}</p>
+      <div className="mt-3 grid gap-2 rounded-2xl bg-[#f8f3ea] p-3 text-xs text-[#5f675f]">
+        <p><strong>Framework:</strong> {example.story_framework || "Not assigned"}</p>
+        <p><strong>Emotional destination:</strong> {example.emotional_destination || "Not assigned"}</p>
+      </div>
       <p className="mt-4 line-clamp-5 whitespace-pre-line text-sm leading-6 text-[#4f5a53]">{example.full_content}</p>
       {!!example.tags?.length && <div className="mt-4 flex flex-wrap gap-2">{example.tags.map((tag) => <span key={tag} className="rounded-full bg-[#eef3ec] px-2.5 py-1 text-xs font-bold text-[#4f6f5a]">{tag}</span>)}</div>}
       <div className="mt-5 flex flex-wrap gap-2">

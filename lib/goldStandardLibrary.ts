@@ -40,6 +40,9 @@ function scoreExample(example: GoldStandardExample, request: RetrievalRequest) {
   if (includesToken(searchable, request.audience)) score += 20;
   if (normalize(example.platform) === normalize(request.platform)) score += 20;
   if (normalize(example.content_type) === normalize(request.contentType)) score += 20;
+  if (includesToken(searchable, request.platform)) score += 8;
+  if (includesToken(searchable, request.contentType)) score += 8;
+  if (example.story_framework) score += 4;
   if ((example.tags || []).some((tag) => includesToken(normalize(request.topic), tag) || includesToken(searchable, tag))) score += 10;
   if (normalize(example.status) === "approved") score += 10;
   return score;
@@ -91,6 +94,8 @@ Example ${index + 1}: ${example.title}
 - Content type: ${example.content_type || "Not labeled"}
 - Hook style: ${example.hook || "Not labeled"}
 - CTA style: ${example.cta || "Not labeled"}
+- Story framework: ${example.story_framework || "Not assigned"}
+- Emotional destination: ${example.emotional_destination || "Not assigned"}
 - Why it is gold standard: ${example.why_gold_standard || "Strong LionHeart-style example."}
 - Tags: ${(example.tags || []).join(", ") || "None"}
 - Content excerpt: ${example.full_content.slice(0, 900)}
