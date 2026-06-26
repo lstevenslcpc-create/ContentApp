@@ -49,6 +49,34 @@ const attachmentProfiles: TopicProfile[] = [
 
 const generalProfiles: TopicProfile[] = [
   {
+    id: "boundaries",
+    label: "Boundaries",
+    aliases: ["boundaries", "boundary", "setting boundaries"],
+    requiredSignals: ["boundaries", "boundary", "saying no", "need", "limits", "disappoint", "resentment", "ask for what you need"],
+    driftSignals: ["fear of abandonment", "tone scanning", "delayed text", "over-texting", "panic after silence"]
+  },
+  {
+    id: "people_pleasing",
+    label: "People pleasing",
+    aliases: ["people pleasing", "people-pleasing", "people pleaser"],
+    requiredSignals: ["people pleasing", "saying yes", "disappoint", "approval", "conflict", "resentment", "needs", "guilt"],
+    driftSignals: ["avoidant attachment", "anxious attachment", "diagnosis"]
+  },
+  {
+    id: "perfectionism",
+    label: "Perfectionism",
+    aliases: ["perfectionism", "perfectionist"],
+    requiredSignals: ["perfectionism", "mistake", "perfect", "grades", "email", "draft", "achievement", "standards"],
+    driftSignals: ["laziness", "motivation problem", "avoidant attachment", "anxious attachment"]
+  },
+  {
+    id: "social_anxiety",
+    label: "Social anxiety",
+    aliases: ["social anxiety", "socially anxious"],
+    requiredSignals: ["social anxiety", "conversation", "group", "being judged", "replaying", "party", "class", "meeting", "social"],
+    driftSignals: ["generalized anxiety", "avoidant attachment", "anxious attachment", "boundaries"]
+  },
+  {
     id: "depression",
     label: "Depression",
     aliases: ["depression", "depressive", "functional depression"],
@@ -215,22 +243,25 @@ export function attachmentTopicRepairCopy(topic: string, goal = "trust-building"
 
   const copy: Record<string, { hook: string; caption: string; visualIdea: string; script: string }> = {
     avoidant_attachment: {
-      hook: "Avoidant attachment can look like needing space before you can name what you feel",
+      hook: "The typing bubble appears. You want to answer, then your body goes quiet.",
       caption: [
-        "What I see in therapy: avoidant attachment is often misunderstood as not caring.",
-        "Many people assume the distance means someone is cold, unavailable, or uninterested. What is actually happening psychologically can be more protective: closeness may feel like pressure, dependence may feel unsafe, and shutting down may feel like the only way to stay regulated.",
-        "Avoidant attachment can look like withdrawing after emotional conversations, minimizing needs, needing space before responding, staying very self-reliant, or feeling uncomfortable when someone wants reassurance or vulnerability.",
-        "The distancing is not the same thing as not having feelings. It can be a deactivating strategy: the body moves away from dependence before the person has language for the fear underneath.",
+        "You are not ignoring them.",
+        "You are trying not to disappear inside the closeness.",
+        "What I see in therapy: this pattern often gets misunderstood as not caring.",
+        "From the outside, the distance can look cold or uninterested. What is actually happening can be more protective: closeness starts to feel like pressure, dependence feels unsafe, and shutting down feels like the only way to stay regulated.",
+        "Avoidant attachment can look like needing space before responding, minimizing needs, withdrawing after emotional conversations, staying self-reliant, or feeling uncomfortable when someone wants vulnerability.",
+        "The distance is not proof that there are no feelings. Sometimes space is the nervous system trying to prevent overwhelm.",
+        "Sometimes \"I need space\" means \"I am trying not to shut down.\"",
         cta
       ].join("\n\n"),
       visualIdea: "Use an Emotional Hook Carousel with quiet space, a person looking away from a phone, muted navy and cream, and slide copy focused on distancing, shutdown, needing space, and minimizing needs.",
       script: "Avoidant attachment is not simply not caring. It can look like shutting down, needing space, minimizing needs, or pulling away when closeness starts to feel like pressure. What is actually happening is often protection, not absence of feeling."
     },
     anxious_attachment: {
-      hook: "Anxious attachment can feel like your body starts searching for rejection before your mind catches up",
+      hook: "You are checking your phone again, and silence starts to feel like rejection.",
       caption: [
         "What I see in therapy: anxious attachment is often misunderstood as being too much.",
-        "Many people assume reassurance seeking or over-texting is clinginess. What is actually happening psychologically is often fear of abandonment, hypervigilance, and a nervous system trying to restore connection when uncertainty feels unsafe.",
+        "From the outside, reassurance seeking or over-texting can look like clinginess. What is actually happening psychologically is often fear of abandonment, hypervigilance, and a nervous system trying to restore connection when uncertainty feels unsafe.",
         "Anxious attachment can look like rereading texts, scanning for tone changes, panicking after delayed replies, overexplaining after conflict, or needing reassurance before your body can settle.",
         "The urgency makes sense, but it is not always a sign that something is wrong in the relationship. Sometimes it is the body responding to old inconsistency as if it is happening again.",
         cta
@@ -242,7 +273,7 @@ export function attachmentTopicRepairCopy(topic: string, goal = "trust-building"
       hook: "Secure attachment is not never feeling triggered. It is knowing repair is possible",
       caption: [
         "What I see in therapy: secure attachment is often misunderstood as constant calm.",
-        "Many people assume secure attachment means you never feel anxious, never need reassurance, and never get hurt. What is actually happening psychologically is different: secure attachment means there is enough trust, repair, direct communication, emotional safety, and interdependence to move through disconnection without losing yourself.",
+        "From the outside, secure attachment can get mistaken for never feeling anxious, never needing reassurance, and never getting hurt. What is actually happening psychologically is different: secure attachment means there is enough trust, repair, direct communication, emotional safety, and interdependence to move through disconnection without losing yourself.",
         "Secure attachment can look like asking for clarity instead of testing someone, naming a need without apologizing for having one, taking space without disappearing, or returning to repair after conflict.",
         "The goal is not perfect regulation. The goal is a relationship pattern where connection and autonomy can both exist.",
         cta
@@ -254,7 +285,7 @@ export function attachmentTopicRepairCopy(topic: string, goal = "trust-building"
       hook: "Disorganized attachment can feel like wanting closeness and fearing it at the same time",
       caption: [
         "What I see in therapy: disorganized attachment is often misunderstood as being confusing on purpose.",
-        "Many people assume the push-pull pattern is drama, mixed signals, or manipulation. What is actually happening psychologically can be a nervous system caught between wanting connection and fearing the very closeness it wants.",
+        "From the outside, the push-pull pattern can look like drama, mixed signals, or manipulation. What is actually happening psychologically can be a nervous system caught between wanting connection and fearing the very closeness it wants.",
         "Disorganized attachment can look like reaching out, then shutting down. Wanting reassurance, then feeling trapped by it. Feeling drawn to someone, then panicking when they get close. Going hot and cold because safety cues feel inconsistent inside the body.",
         "This pattern is not simply anxious attachment or avoidant attachment. It is often an approach-avoid response where closeness and danger can feel tangled together.",
         cta
@@ -268,4 +299,107 @@ export function attachmentTopicRepairCopy(topic: string, goal = "trust-building"
     focus: profile.label,
     ...copy[profile.id]
   };
+}
+
+export function generalTopicRepairCopy(topic: string, goal = "trust-building") {
+  const normalizedTopic = normalize(topic);
+  const cta = goal === "follower-growth"
+    ? "Save this if it felt familiar, and follow @LHtherapy for emotionally honest mental health content."
+    : "Use this as a reflection point before you decide the reaction is just a personal flaw.";
+
+  if (normalizedTopic.includes("boundar")) {
+    return {
+      focus: "Boundaries",
+      hook: "You type the boundary, then delete it before anyone can be disappointed.",
+      caption: [
+        "You know what you need.",
+        "Then your body starts preparing for someone to be upset.",
+        "What I see in therapy: boundaries often feel rude when you learned that keeping people comfortable was safer than being honest.",
+        "This can look like overexplaining a no, apologizing before asking for space, saying yes while resentment builds, or waiting until you are exhausted before naming a limit.",
+        "The boundary is not the problem. The fear of what might happen after the boundary is the part asking for attention.",
+        "Sometimes a boundary is your nervous system learning that honesty does not have to equal danger.",
+        cta
+      ].join("\n\n"),
+      visualIdea: "Use an Emotional Hook Carousel with a deleted text message, soft navy and sage, and slide copy focused on saying no, overexplaining, guilt, and resentment.",
+      script: "A boundary can feel rude when you learned that keeping people comfortable was safer than being honest. The work is not becoming harsh. The work is learning to stay connected to yourself while someone else has a feeling."
+    };
+  }
+
+  if (normalizedTopic.includes("people pleasing") || normalizedTopic.includes("people pleaser")) {
+    return {
+      focus: "People pleasing",
+      hook: "You say yes, then rehearse how exhausted you are allowed to feel.",
+      caption: [
+        "You smiled when you said it.",
+        "Then your chest tightened on the way home.",
+        "What I see in therapy: people pleasing is often fear wearing kindness clothes.",
+        "This can look like rewriting a simple text, apologizing before asking for what you need, saying yes while resentment builds, or feeling responsible for everyone else's mood.",
+        "The behavior makes more sense when you understand what it was trying to protect.",
+        "Sometimes the old rule is: if no one is disappointed, I am safe.",
+        "Your coping strategy is not your personality.",
+        cta
+      ].join("\n\n"),
+      visualIdea: "Use an Emotional Hook Carousel with a deleted boundary text, car after saying yes, and soft navy, cream, sage, and muted gold.",
+      script: "People pleasing is not just being nice. It can be fear wearing kindness clothes. You say yes, then your body carries the resentment later because disappointing someone once felt unsafe."
+    };
+  }
+
+  if (normalizedTopic.includes("social anxiety")) {
+    return {
+      focus: "Social anxiety",
+      hook: "You leave the conversation, then replay one sentence for the rest of the night.",
+      caption: [
+        "You smiled.",
+        "You answered.",
+        "You looked calm enough.",
+        "Then your brain started reviewing every pause, every facial expression, every word you wish you had said differently.",
+        "What I see in therapy: social anxiety often looks like functioning in the moment and falling apart afterward.",
+        "The fear is not always the conversation itself. Sometimes it is the imagined judgment your body starts preparing for after the conversation ends.",
+        "Your coping strategy is not your personality.",
+        cta
+      ].join("\n\n"),
+      visualIdea: "Use an Emotional Hook Carousel with a quiet car after an event, muted navy, cream, and text-message style thought bubbles about replaying conversations.",
+      script: "Social anxiety can look like seeming fine in the moment and replaying the entire conversation afterward. The body is trying to protect you from judgment, even when there is no clear danger in front of you."
+    };
+  }
+
+  if (normalizedTopic.includes("perfection")) {
+    return {
+      focus: "Perfectionism",
+      hook: "You rewrite the email six times because one mistake feels too expensive.",
+      caption: [
+        "It looks like high standards.",
+        "Inside, it can feel like one wrong move will change how people see you.",
+        "What I see in therapy: perfectionism is often fear wearing achievement clothes.",
+        "What is actually happening is protective: the mind keeps trying to prevent the mistake before anyone else can notice it.",
+        "This can look like avoiding the first draft, rereading a message until it stops sounding human, procrastinating because starting imperfectly feels unbearable, or treating every task like it has equal emotional weight.",
+        "The behavior makes more sense when you understand what it was trying to protect.",
+        "The goal is not to stop caring. The goal is to stop making every mistake feel like evidence against you.",
+        "Your worth was never supposed to be graded by your output.",
+        cta
+      ].join("\n\n"),
+      visualIdea: "Use an Emotional Hook Carousel with laptop notes, crossed-out drafts, and clean cream, sage, and muted gold details.",
+      script: "Perfectionism can look like high achievement, but underneath it is often fear. Fear of mistakes. Fear of being seen as careless. Fear that your output is the evidence of your worth."
+    };
+  }
+
+  if (normalizedTopic.includes("teen girls") || normalizedTopic.includes("parenting teen girls")) {
+    const parentAngle = normalizedTopic.includes("parent");
+    return {
+      focus: parentAngle ? "Parenting teen girls" : "Teen girls",
+      hook: parentAngle ? "She says \"I'm fine,\" then shuts her bedroom door before the tears come." : "She says \"I'm fine,\" then spends the night trying to hold herself together.",
+      caption: [
+        parentAngle ? "From the outside, it can look like attitude." : "From the outside, it can look like she does not care.",
+        "What I see in therapy: teen girls often hide anxiety behind irritability, perfectionism, friendship stress, stomach aches, and shutting down.",
+        parentAngle ? "A parent may ask what is wrong and get silence, not because their teen is trying to be cruel, but because she may not have words yet for the pressure she is carrying." : "She may be managing school pressure, friend-group tension, body image, grades, and the fear that needing help will worry everyone.",
+        "The behavior makes more sense when you understand what it was trying to protect.",
+        parentAngle ? "Sometimes support starts with less interrogation and more emotional safety." : "Sometimes \"I'm fine\" means \"I do not know how to explain this without falling apart.\"",
+        cta
+      ].join("\n\n"),
+      visualIdea: "Use a Teen Mental Health Carousel with school hallway, notebook, bedroom, or phone visuals. Keep it soft, modern, and non-stock.",
+      script: "Teen anxiety can hide behind irritability, perfectionism, stomach aches, or saying I'm fine. The behavior is not always attitude. Sometimes it is overwhelm without language yet."
+    };
+  }
+
+  return null;
 }

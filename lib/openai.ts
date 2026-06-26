@@ -9,7 +9,8 @@ import { buildExampleBrief } from "./realLifeExampleEngine";
 import { buildTherapistInsightBrief } from "./therapistInsightEngine";
 import { buildTherapistObservationBrief } from "./therapistObservationEngine";
 import { applyLionHeartVoiceGuidance, LIONHEART_MINIMUM_VOICE_SCORE, scoreLionHeartVoice } from "./lionheartVoiceLibrary";
-import { assessTopicFidelity, attachmentTopicRepairCopy, topicFidelityInstruction } from "./topicFidelity";
+import { buildLionHeartEditorialPrompt, enforceEditorialBasics, scoreLionHeartEditorialDraft } from "./lionheartEditorialEngine";
+import { assessTopicFidelity, attachmentTopicRepairCopy, generalTopicRepairCopy, topicFidelityInstruction } from "./topicFidelity";
 
 type GeneratedPost = {
   hook: string;
@@ -719,7 +720,128 @@ Return JSON only:
     }) as GeneratedPost;
   }
 
+  async function runEditorialPass(post: GeneratedPost, passNumber: number) {
+    const editorialScore = scoreLionHeartEditorialDraft(post, {
+      topic: request.topic,
+      goal: request.contentGoal,
+      platform: request.platform,
+      contentType: request.contentType,
+      audience: profile.target_audience
+    });
+    if (!editorialScore.revisionNeeded) {
+      return enforceEditorialBasics({
+        ...post,
+        why_this_works: {
+          ...(post.why_this_works || {}),
+          editorial_passes: passNumber,
+          editorial_intelligence_score: editorialScore,
+          one_big_idea: editorialScore.oneBigIdea,
+          screenshot_sentence: editorialScore.screenshotSentence
+        }
+      }, {
+        topic: request.topic,
+        goal: request.contentGoal,
+        platform: request.platform,
+        contentType: request.contentType,
+        audience: profile.target_audience
+      }) as GeneratedPost;
+    }
+
+    const completion = await withTimeout(
+      client.chat.completions.create({
+        model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+        temperature: 0.55,
+        max_tokens: 1100,
+        response_format: { type: "json_object" },
+        messages: [
+          {
+            role: "system",
+            content: "Return only valid JSON. Act as LionHeart Therapy's ruthless human editor. Cut weak explanation. Keep emotional recognition. Avoid em dashes completely."
+          },
+          {
+            role: "user",
+            content: buildLionHeartEditorialPrompt(post, editorialScore, {
+              topic: request.topic,
+              goal: request.contentGoal,
+              platform: request.platform,
+              contentType: request.contentType,
+              audience: profile.target_audience
+            })
+          }
+        ]
+      }),
+      16000,
+      "LionHeart editorial pass"
+    );
+
+    const raw = completion.choices[0]?.message?.content;
+    if (!raw) throw new Error("OpenAI returned an empty LionHeart editorial pass.");
+    const parsed = extractJsonObject(raw) as Partial<GeneratedPost> & {
+      one_big_idea?: string;
+      screenshot_sentence?: string;
+    };
+    const edited = removeEmDashesDeep({
+      ...post,
+      hook: typeof parsed.hook === "string" && parsed.hook.trim() ? parsed.hook.trim() : post.hook,
+      caption: typeof parsed.caption === "string" && parsed.caption.trim() ? parsed.caption.trim() : post.caption,
+      hashtags: Array.isArray(parsed.hashtags) ? parsed.hashtags.map(String) : post.hashtags,
+      visual_idea: typeof parsed.visual_idea === "string" && parsed.visual_idea.trim() ? parsed.visual_idea.trim() : post.visual_idea,
+      script: typeof parsed.script === "string" ? parsed.script.trim() : post.script,
+      why_this_works: {
+        ...(post.why_this_works || {}),
+        editorial_passes: passNumber,
+        editorial_reasons: editorialScore.reasons,
+        one_big_idea: typeof parsed.one_big_idea === "string" && parsed.one_big_idea.trim() ? parsed.one_big_idea.trim() : editorialScore.oneBigIdea,
+        screenshot_sentence: typeof parsed.screenshot_sentence === "string" && parsed.screenshot_sentence.trim() ? parsed.screenshot_sentence.trim() : editorialScore.screenshotSentence
+      }
+    }) as GeneratedPost;
+    const revisedScore = scoreLionHeartEditorialDraft(edited, {
+      topic: request.topic,
+      goal: request.contentGoal,
+      platform: request.platform,
+      contentType: request.contentType,
+      audience: profile.target_audience
+    });
+    return enforceEditorialBasics({
+      ...edited,
+      why_this_works: {
+        ...(edited.why_this_works || {}),
+        editorial_intelligence_score: revisedScore,
+        lionheart_voice_check: revisedScore.voice,
+        one_big_idea: edited.why_this_works?.one_big_idea || revisedScore.oneBigIdea,
+        screenshot_sentence: edited.why_this_works?.screenshot_sentence || revisedScore.screenshotSentence
+      }
+    }, {
+      topic: request.topic,
+      goal: request.contentGoal,
+      platform: request.platform,
+      contentType: request.contentType,
+      audience: profile.target_audience
+    }) as GeneratedPost;
+  }
+
   function forceLionHeartVoiceFloor(post: GeneratedPost) {
+    const attachmentRepair = attachmentTopicRepairCopy(request.topic, request.contentGoal);
+    if (attachmentRepair) {
+      const repaired = removeEmDashesDeep({
+        ...post,
+        hook: attachmentRepair.hook,
+        caption: attachmentRepair.caption,
+        visual_idea: attachmentRepair.visualIdea,
+        script: request.contentType?.toLowerCase().includes("video") || request.platform?.toLowerCase().includes("tiktok") ? attachmentRepair.script : post.script || attachmentRepair.script,
+        why_this_works: {
+          ...(post.why_this_works || {}),
+          goal_used: post.why_this_works?.goal_used || request.contentGoal,
+          audience_insight: post.why_this_works?.audience_insight || researchBrief.audience_insight,
+          psychological_angle: `${attachmentRepair.focus} attachment-style distinction`,
+          cta_strategy: post.why_this_works?.cta_strategy || researchBrief.cta_strategy,
+          suggested_template: post.why_this_works?.suggested_template || researchBrief.suggested_template,
+          screenshot_sentence: "The behavior makes more sense when you understand what it was trying to protect.",
+          voice_floor_repair_applied: true
+        }
+      }) as GeneratedPost;
+      return repaired;
+    }
     const example =
       post.whatThisCanLookLike?.[0] ||
       post.behaviors?.[0] ||
@@ -1020,7 +1142,7 @@ Mention adjacent concepts only as brief comparisons.
   });
   const voiceRewritten: GeneratedPost[] = [];
   for (const post of normalized) {
-    const voiceScore = post.why_this_works?.lionheart_voice_check || scoreLionHeartVoice(
+    const voiceScore = scoreLionHeartVoice(
       [post.hook, post.caption, post.script, post.visual_idea].filter(Boolean).join("\n\n"),
       { topic: request.topic, goal: request.contentGoal, platform: request.platform, contentType: request.contentType, audience: profile.target_audience }
     );
@@ -1078,6 +1200,139 @@ Mention adjacent concepts only as brief comparisons.
     }
   }
   normalized = voiceRewritten;
+  const editorialPosts: GeneratedPost[] = [];
+  for (const post of normalized) {
+    let editedPost = post;
+    for (let pass = 1; pass <= 2; pass += 1) {
+      const score = scoreLionHeartEditorialDraft(editedPost, {
+        topic: request.topic,
+        goal: request.contentGoal,
+        platform: request.platform,
+        contentType: request.contentType,
+        audience: profile.target_audience
+      });
+      if (!score.revisionNeeded && pass > 1) break;
+      try {
+        editedPost = await runEditorialPass(editedPost, pass);
+      } catch (error) {
+        console.error("[openai][content-generator][editorial-pass-failed]", {
+          message: safeErrorMessage(error),
+          pass,
+          stackPreview: error instanceof Error ? error.stack?.slice(0, 900) : undefined
+        });
+        editedPost = enforceEditorialBasics(editedPost, {
+          topic: request.topic,
+          goal: request.contentGoal,
+          platform: request.platform,
+          contentType: request.contentType,
+          audience: profile.target_audience
+        }) as GeneratedPost;
+        break;
+      }
+      const nextScore = scoreLionHeartEditorialDraft(editedPost, {
+        topic: request.topic,
+        goal: request.contentGoal,
+        platform: request.platform,
+        contentType: request.contentType,
+        audience: profile.target_audience
+      });
+      if (!nextScore.revisionNeeded) break;
+    }
+    const preFinalScore = scoreLionHeartEditorialDraft(editedPost, {
+      topic: request.topic,
+      goal: request.contentGoal,
+      platform: request.platform,
+      contentType: request.contentType,
+      audience: profile.target_audience
+    });
+    if (preFinalScore.revisionNeeded && attachmentTopicRepairCopy(request.topic, request.contentGoal)) {
+      editedPost = forceLionHeartVoiceFloor(editedPost);
+    } else if (preFinalScore.revisionNeeded && generalTopicRepairCopy(request.topic, request.contentGoal)) {
+      const repair = generalTopicRepairCopy(request.topic, request.contentGoal);
+      if (repair) {
+        editedPost = removeEmDashesDeep({
+          ...editedPost,
+          hook: repair.hook,
+          caption: repair.caption,
+          visual_idea: repair.visualIdea,
+          script: request.contentType?.toLowerCase().includes("video") || request.platform?.toLowerCase().includes("tiktok") ? repair.script : editedPost.script || repair.script,
+          why_this_works: {
+            ...(editedPost.why_this_works || {}),
+            final_editorial_repair_applied: true,
+            psychological_angle: `${repair.focus} recognition and emotional safety`,
+            therapist_observation: `What I see in therapy: ${repair.focus} needs to stay distinct and should not drift into an adjacent topic.`
+          }
+        }) as GeneratedPost;
+      }
+    }
+    const finalEditorialScore = scoreLionHeartEditorialDraft(editedPost, {
+      topic: request.topic,
+      goal: request.contentGoal,
+      platform: request.platform,
+      contentType: request.contentType,
+      audience: profile.target_audience
+    });
+    const finalTopicFidelity = assessTopicFidelity({
+      requestedTopic: request.topic,
+      contentAngle: editedPost.content_angle,
+      hook: editedPost.hook,
+      caption: editedPost.caption,
+      visualIdea: editedPost.visual_idea,
+      script: editedPost.script
+    });
+    let outputPost = editedPost;
+    let outputTopicFidelity = finalTopicFidelity;
+    if (finalTopicFidelity.topicMatch !== "Strong") {
+      const repair = attachmentTopicRepairCopy(request.topic, request.contentGoal) || generalTopicRepairCopy(request.topic, request.contentGoal);
+      if (repair) {
+        outputPost = removeEmDashesDeep({
+          ...editedPost,
+          hook: repair.hook,
+          caption: repair.caption,
+          visual_idea: repair.visualIdea,
+          script: request.contentType?.toLowerCase().includes("video") || request.platform?.toLowerCase().includes("tiktok") ? repair.script : editedPost.script || repair.script,
+          why_this_works: {
+            ...(editedPost.why_this_works || {}),
+            final_topic_repair_applied: true,
+            psychological_angle: `${repair.focus} attachment-style distinction`,
+            therapist_observation: `What I see in therapy: ${repair.focus} has a distinct relational pattern that should not be swapped with another attachment style.`
+          }
+        }) as GeneratedPost;
+        outputTopicFidelity = assessTopicFidelity({
+          requestedTopic: request.topic,
+          contentAngle: outputPost.content_angle,
+          hook: outputPost.hook,
+          caption: outputPost.caption,
+          visualIdea: outputPost.visual_idea,
+          script: outputPost.script
+        });
+      }
+    }
+    const outputEditorialScore = scoreLionHeartEditorialDraft(outputPost, {
+      topic: request.topic,
+      goal: request.contentGoal,
+      platform: request.platform,
+      contentType: request.contentType,
+      audience: profile.target_audience
+    });
+    editorialPosts.push({
+      ...outputPost,
+      why_this_works: {
+        ...outputPost.why_this_works,
+        goal_used: outputPost.why_this_works?.goal_used || request.contentGoal,
+        audience_insight: outputPost.why_this_works?.audience_insight || researchBrief.audience_insight,
+        psychological_angle: outputPost.why_this_works?.psychological_angle || researchBrief.psychological_angle,
+        cta_strategy: outputPost.why_this_works?.cta_strategy || researchBrief.cta_strategy,
+        suggested_template: outputPost.why_this_works?.suggested_template || researchBrief.suggested_template,
+        topic_fidelity: outputTopicFidelity,
+        lionheart_voice_check: outputEditorialScore.voice,
+        editorial_intelligence_score: outputEditorialScore,
+        one_big_idea: outputEditorialScore.oneBigIdea,
+        screenshot_sentence: outputEditorialScore.screenshotSentence
+      }
+    });
+  }
+  normalized = editorialPosts;
   return normalized;
 }
 

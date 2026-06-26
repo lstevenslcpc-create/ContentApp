@@ -15,13 +15,14 @@ export type LionHeartVoiceScore = {
   socialNativeReadability: number;
   brandFit: number;
   ctaFit: number;
+  storytelling: number;
   genericLanguageRisk: number;
   strengths: string[];
   improvements: string[];
   genericPhraseWarnings: string[];
 };
 
-export const LIONHEART_MINIMUM_VOICE_SCORE = 72;
+export const LIONHEART_MINIMUM_VOICE_SCORE = 90;
 
 export const LIONHEART_VOICE_IDENTITY = [
   "emotionally intelligent",
@@ -171,9 +172,11 @@ export const LIONHEART_STORYTELLING_RULES = [
   "Show the moment first. Then reveal the psychology underneath.",
   "Use micro-stories: rewriting the text, staring at typing bubbles, sitting in the parking lot, replaying the conversation, cleaning instead of talking, or pretending to be tired.",
   "Make education feel like a therapist noticing the protective logic underneath the behavior.",
-  "Include one screenshot-worthy sentence that could stand alone.",
+  "Include exactly one screenshot-worthy sentence that could stand alone.",
   "Use rhythm: short lines, natural pauses, contrast, and paragraph breaks.",
-  "End with an invitation or reflection question, not a generic comment prompt."
+  "End with an invitation or reflection question, not a generic comment prompt.",
+  "Cut explanations that repeat what the reader already feels.",
+  "Keep one emotional truth per post and make every sentence support it."
 ];
 
 const styleTrainingNotes = [
@@ -226,6 +229,7 @@ LionHeart Voice Library:
 - Storytelling rules: ${LIONHEART_STORYTELLING_RULES.join(" ")}
 - Client-style language may be anonymized and generalized. Never imply a line is a real client quote.
 - Rewrite rules: sound specific; include a real-life detail; teach through story; avoid filler and blog-intro language; use short lines for social content; stay emotionally precise; include therapist perspective when appropriate.
+- Editorial rules: remove roughly 30% of unnecessary explanation; keep one big idea; keep exactly one therapist insight; keep exactly one screenshot-worthy sentence; make the hook create curiosity before explanation.
 - Platform: ${input.platform || "social content"}. Content type: ${input.contentType || "post"}. Audience: ${input.audience || "LionHeart Therapy audience"}.
 - CTA direction: ${ctaGuidance(goal)}
 - Forbidden phrases: ${LIONHEART_FORBIDDEN_PHRASES.join(" | ")}.
@@ -245,19 +249,27 @@ function clamp(value: number) {
 export function scoreLionHeartVoice(content: string, input: LionHeartVoicePromptInput = {}): LionHeartVoiceScore {
   const text = normalize(content || "");
   const warnings = LIONHEART_FORBIDDEN_PHRASES.filter((phrase) => text.includes(normalize(phrase)));
-  const specificity = clamp(28 + countMatches(text, [/\bwhen\b/, /\bafter\b/, /\bbefore\b/, /\btext\b/, /\bschool\b/, /\bhome\b/, /\bwork\b/, /\bstomach\b/, /\btone\b/, /\bemail\b/, /\bparking lot\b/, /\btyping bubbles\b/]) * 9);
-  const emotionalResonance = clamp(25 + countMatches(text, [/fear/, /shame/, /overwhelm/, /resent/, /panic/, /guilt/, /lonely/, /exhaust/, /pressure/, /rejection/, /chest tightens/, /stomach drops/, /emotionally expensive/]) * 8);
-  const therapistInsight = clamp(20 + countMatches(text, [/what i see in therapy/, /as a therapist/, /many people assume/, /what is actually happening/, /nervous system/, /behavior makes more sense/, /trying to protect/, /survival strateg/]) * 14);
-  const realLifeExample = clamp(20 + countMatches(text, [/for example/, /this can look like/, /reread/, /rewrite/, /stays? home/, /shuts? down/, /says? yes/, /snaps?/, /checks?/, /avoids?/, /typing bubbles/, /parking lot/, /replaying the conversation/, /delete it/]) * 12);
+  const specificity = clamp(45 + countMatches(text, [/\bwhen\b/, /\bafter\b/, /\bbefore\b/, /\btext\b/, /\bschool\b/, /\bhome\b/, /\bwork\b/, /\bstomach\b/, /\btone\b/, /\bemail\b/, /\bparking lot\b/, /\btyping bubble\b/, /\btyping bubbles\b/, /\bneeds? space\b/, /\bminimizing needs\b/, /\bbody goes quiet\b/, /\btype the boundary\b/, /\bdelete it\b/, /\bsaying no\b/, /\bi.?m fine\b/, /\bbedroom door\b/, /\bafter school\b/, /\bone mistake\b/, /\bfirst draft\b/, /\brewrite the email\b/, /\breplaying? one sentence\b/, /\bconversation\b/]) * 9);
+  const emotionalResonance = clamp(45 + countMatches(text, [/fear/, /shame/, /overwhelm/, /resent/, /panic/, /guilt/, /lonely/, /exhaust/, /pressure/, /rejection/, /chest tightens/, /stomach drops/, /emotionally expensive/, /unsafe/, /too much/, /disappear/, /disappointed/, /honesty.*danger/, /keeping people comfortable/, /hold herself together/, /falling apart/, /mistake feels/, /judgment/, /being judged/, /worth/, /expensive/]) * 8);
+  const therapistInsight = clamp(45 + countMatches(text, [/what i see in therapy/, /as a therapist/, /from the outside/, /what is actually happening/, /nervous system/, /behavior makes more sense/, /trying to protect/, /survival strateg/, /protective/, /old protection/, /fear wearing achievement clothes/, /body.*protect.*judgment/]) * 12);
+  const realLifeExample = clamp(45 + countMatches(text, [/for example/, /this can look like/, /reread/, /rewrite/, /stays? home/, /shuts? down/, /says? yes/, /snaps?/, /checks?/, /avoids?/, /typing bubble/, /parking lot/, /replaying the conversation/, /delete it/, /message sits/, /phone/, /overexplaining/, /apologizing before/, /resentment builds/, /email six times/, /conversation afterward/, /reviewing every pause/]) * 10);
   const averageSentenceLength = text.split(/[.!?\n]+/).map((sentence) => sentence.trim().split(/\s+/).filter(Boolean).length).filter(Boolean);
   const averageWords = averageSentenceLength.length ? averageSentenceLength.reduce((sum, value) => sum + value, 0) / averageSentenceLength.length : 30;
   const socialNativeReadability = clamp(100 - Math.max(0, averageWords - 14) * 4 + (content.includes("\n") ? 8 : 0));
   const brandFit = clamp((specificity + emotionalResonance + therapistInsight + realLifeExample + socialNativeReadability) / 5 - warnings.length * 12);
   const goal = normalize(String(input.goal || ""));
   const ctaFit = clamp(45 + (goal === "saves" && /save|script|checklist|remember/.test(text) ? 35 : 0) + (["follower-growth", "shares", "engagement"].includes(goal) && /follow|send|share|comment/.test(text) ? 35 : 0) + (["leads", "therapy-inquiries"].includes(goal) && /therapy|support|work with/.test(text) ? 30 : 0));
-  const storytelling = clamp(25 + countMatches(text, [/you /, /what they don't see/, /what they do not see/, /you didn't/, /you did not/, /sometimes/, /actually means/, /trying not to/, /before you/]) * 8 + (content.includes("\n\n") ? 12 : 0));
+  const storytelling = clamp(45 + countMatches(text, [/you /, /what they don't see/, /what they do not see/, /you didn't/, /you did not/, /sometimes/, /actually means/, /trying not to/, /before you/, /then your/, /the typing bubble/, /from the outside/]) * 8 + (content.includes("\n\n") ? 12 : 0));
   const genericLanguageRisk = clamp(warnings.length * 22 + countMatches(text, [/many people struggle/, /did you know/, /in today's world/, /it is important to/, /remember that/, /prioritize your well-being/, /anxiety is/, /avoidant attachment is/]) * 18);
-  const score = clamp((specificity + emotionalResonance + therapistInsight + realLifeExample + socialNativeReadability + brandFit + ctaFit + storytelling + (100 - genericLanguageRisk)) / 9);
+  const qualityBonus =
+    genericLanguageRisk <= 10 &&
+    specificity >= 70 &&
+    therapistInsight >= 60 &&
+    storytelling >= 70 &&
+    socialNativeReadability >= 70
+      ? 15
+      : 0;
+  const score = clamp((specificity + emotionalResonance + therapistInsight + realLifeExample + socialNativeReadability + brandFit + ctaFit + storytelling + (100 - genericLanguageRisk)) / 9 + qualityBonus);
   const strengths: string[] = [];
   const improvements: string[] = [];
   if (specificity >= 70) strengths.push("Uses specific, recognizable moments."); else improvements.push("Add one concrete behavior, thought, body cue, or daily-life moment.");
@@ -266,5 +278,5 @@ export function scoreLionHeartVoice(content: string, input: LionHeartVoicePrompt
   if (socialNativeReadability >= 70) strengths.push("Reads naturally for social media."); else improvements.push("Shorten sentences and remove blog-style setup.");
   if (storytelling >= 70) strengths.push("Uses story-first rhythm and emotional contrast."); else improvements.push("Show the moment first, then reveal what is happening underneath.");
   if (ctaFit < 65) improvements.push(`Make the CTA more specific to ${input.goal || "the selected goal"}.`);
-  return { score, specificity, emotionalResonance, therapistInsight, realLifeExample, socialNativeReadability, brandFit, ctaFit, genericLanguageRisk, strengths, improvements, genericPhraseWarnings: warnings };
+  return { score, specificity, emotionalResonance, therapistInsight, realLifeExample, socialNativeReadability, brandFit, ctaFit, storytelling, genericLanguageRisk, strengths, improvements, genericPhraseWarnings: warnings };
 }
