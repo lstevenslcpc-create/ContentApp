@@ -13,7 +13,7 @@ import { MobileBottomNav } from "./MobileBottomNav";
 const publicPaths = new Set(["/", "/auth"]);
 
 function normalizeNextPath(pathname: string) {
-  if (!pathname || pathname === "/auth") return "/brand-brain";
+  if (!pathname || pathname === "/auth") return "/workspace";
   return pathname;
 }
 

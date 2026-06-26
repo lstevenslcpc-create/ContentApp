@@ -20,7 +20,7 @@ export function AuthPanel() {
   const [mode, setMode] = useState<"sign-in" | "sign-up">("sign-in");
   const [message, setMessage] = useState<Message | null>(null);
   const [loading, setLoading] = useState(false);
-  const [returnTo, setReturnTo] = useState("/brand-brain");
+  const [returnTo, setReturnTo] = useState("/workspace");
 
   useEffect(() => {
     if (!supabase) return;

@@ -7,6 +7,17 @@ import type { GeneratedContent, MediaProviderResponse } from "@/lib/types";
 import { useContentItems } from "./useContentItems";
 import { SaveToLibraryButton } from "./media-library/SaveToLibraryButton";
 
+const creationTypes = [
+  "Advertisement",
+  "Quote Post",
+  "Product Promo",
+  "Service Promo",
+  "General Social Post",
+  "Pinterest Pin",
+  "Reel/TikTok Cover",
+  "Workbook/Product Mockup"
+];
+
 export function MediaGeneratorPanel({ content, provider }: { content: GeneratedContent[]; provider: string }) {
   const searchParams = useSearchParams();
   const initialContentId = searchParams.get("contentId") || "";
@@ -15,22 +26,26 @@ export function MediaGeneratorPanel({ content, provider }: { content: GeneratedC
   const [result, setResult] = useState<MediaProviderResponse | null>(null);
   const [lastPrompt, setLastPrompt] = useState("");
   const [lastMediaType, setLastMediaType] = useState<"image" | "video">("image");
+  const [lastCreationType, setLastCreationType] = useState("General Social Post");
   const [loading, setLoading] = useState(false);
 
   async function submit(formData: FormData) {
     setLoading(true);
     setResult(null);
     const selected = contentOptions.find((item) => item.id === formData.get("contentId"));
+    const creationType = String(formData.get("creationType") || "General Social Post");
     const prompt = String(formData.get("prompt") || selected?.visual_idea || selected?.hook || "");
+    const creativePrompt = `${creationType}: ${prompt}`;
     const mediaType = formData.get("mediaType") === "video" ? "video" : "image";
-    setLastPrompt(prompt);
+    setLastPrompt(creativePrompt);
     setLastMediaType(mediaType);
+    setLastCreationType(creationType);
     const response = await authedFetch("/api/media/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contentId: formData.get("contentId") || undefined,
-        prompt,
+        prompt: creativePrompt,
         mediaType,
         aspectRatio: formData.get("aspectRatio"),
         style: formData.get("style")
@@ -45,6 +60,7 @@ export function MediaGeneratorPanel({ content, provider }: { content: GeneratedC
       <form action={submit} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="mb-4 rounded-lg bg-slate-50 p-3 text-sm font-semibold text-slate-700">Current provider: {provider}</div>
         <div className="grid gap-4">
+          <label><span className="label">Creation type</span><select className="field mt-1" name="creationType">{creationTypes.map((type) => <option key={type}>{type}</option>)}</select></label>
           <label><span className="label">Content selector</span><select className="field mt-1" name="contentId" defaultValue={initialContentId}><option value="">No linked post</option>{contentOptions.map((item) => <option key={item.id} value={item.id}>{item.platform} · {item.hook?.slice(0, 70)}</option>)}</select></label>
           <label><span className="label">Prompt</span><textarea className="field mt-1 min-h-32" name="prompt" placeholder="Describe the image or video you want..." /></label>
           <label><span className="label">Media type</span><select className="field mt-1" name="mediaType"><option value="image">image</option><option value="video">video</option></select></label>
@@ -62,22 +78,27 @@ export function MediaGeneratorPanel({ content, provider }: { content: GeneratedC
           <div className="mt-5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={result.mediaUrl} alt="Generated media" className="max-h-[560px] w-full rounded-xl object-contain ring-1 ring-slate-200" />
+            <div className="mt-4 rounded-xl bg-[#fffdf8] p-3 text-sm font-semibold leading-6 text-[#6f766f]">
+              Media asset created. Save it to the Media Library, then attach or reference it during Approval Review, Canva Prep, or Ready to Post.
+            </div>
             <div className="mt-4 flex flex-wrap gap-2">
               <a href={result.mediaUrl} target="_blank" className="btn-secondary">Open</a>
               <a href={result.mediaUrl} download className="btn-secondary">Download</a>
               <SaveToLibraryButton
                 payload={{
-                  title: `${lastMediaType === "video" ? "Video" : "Image"} from AI Media Generator`,
+                  title: `${lastCreationType} from Creative Studio`,
                   asset_type: lastMediaType,
                   source: "ai_media_generator",
                   media_url: result.mediaUrl,
                   thumbnail_url: result.mediaUrl,
                   prompt: lastPrompt,
-                  tags: [lastMediaType, result.provider],
+                  tags: [lastMediaType, result.provider, lastCreationType],
                   status: "saved"
                 }}
                 label="Save to Library"
               />
+              <a href="/media-library" className="btn-secondary">Open Media Library</a>
+              <a href="/approval-review" className="btn-secondary">Open Approval Review</a>
             </div>
           </div>
         )}

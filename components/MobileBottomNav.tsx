@@ -6,18 +6,18 @@ import type { User } from "@supabase/supabase-js";
 import { Brain, CheckSquare, Compass, Home, Image, LogIn, UserCircle2 } from "lucide-react";
 
 const nav = [
-  { href: "/dashboard", label: "Home", icon: Home },
+  { href: "/workspace", label: "Home", icon: Home },
   { href: "/brand-brain", label: "Brain", icon: Brain },
   { href: "/content-intelligence", label: "Ideas", icon: Compass },
   { href: "/approval-review", label: "Review", icon: CheckSquare },
-  { href: "/media-generator", label: "Media", icon: Image }
+  { href: "/media-generator", label: "Studio", icon: Image }
 ];
 
 export function MobileBottomNav({ user, checkedAuth }: { user: User | null; checkedAuth: boolean }) {
   const pathname = usePathname();
   const accountItem = checkedAuth && user
     ? { href: "/auth", label: "Account", icon: UserCircle2 }
-    : { href: `/auth?next=${encodeURIComponent(pathname || "/brand-brain")}`, label: "Sign In", icon: LogIn };
+    : { href: `/auth?next=${encodeURIComponent(pathname || "/workspace")}`, label: "Sign In", icon: LogIn };
   const mobileNav = [...nav, accountItem];
 
   return (

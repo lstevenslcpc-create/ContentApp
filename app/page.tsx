@@ -40,12 +40,12 @@ export default function LandingPage() {
             Built for LionHeart Therapy to plan, generate, review, organize, and manually publish AI-assisted marketing content without losing clinical nuance or brand warmth.
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
-            <Link href="/brand-brain" className="btn-primary bg-[#c9b7ee] text-[#2f2550] hover:bg-[#bba5e8]">
-              Open Brand Brain
+            <Link href="/workspace" className="btn-primary bg-[#c9b7ee] text-[#2f2550] hover:bg-[#bba5e8]">
+              Open Daily Workspace
               <ArrowRight size={16} />
             </Link>
-            <Link href="/dashboard" className="btn-secondary border-white/20 bg-white/10 text-white hover:bg-white/15">
-              View Dashboard
+            <Link href="/auth?next=/workspace" className="btn-secondary border-white/20 bg-white/10 text-white hover:bg-white/15">
+              Sign In
             </Link>
           </div>
           <p className="mt-6 text-xs leading-5 text-[#d9d0c0]">
