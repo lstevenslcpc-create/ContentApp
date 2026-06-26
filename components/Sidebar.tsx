@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
-import { BarChart3, Brain, CalendarDays, CheckSquare, Clapperboard, Compass, FolderOpen, Home, Image, LayoutTemplate, Megaphone, Plug, Settings, Sparkles, UserRound, WalletCards } from "lucide-react";
+import { BarChart3, BookOpenCheck, Brain, CalendarDays, CheckSquare, Clapperboard, Compass, FolderOpen, Home, Image, LayoutTemplate, Megaphone, Plug, Settings, Sparkles, UserRound, WalletCards } from "lucide-react";
 import { AccountBadge } from "./AccountBadge";
 
 const nav = [
   { href: "/dashboard", label: "Dashboard", icon: Home },
   { href: "/brand-brain", label: "Brand Brain", icon: Brain },
   { href: "/content-intelligence", label: "Content Intelligence", icon: Compass },
+  { href: "/gold-standard-library", label: "Gold Standards", icon: BookOpenCheck },
   { href: "/business-profile", label: "Business Profile", icon: UserRound },
   { href: "/content-generator", label: "Content Generator", icon: Sparkles },
   { href: "/media-generator", label: "AI Media", icon: Image },

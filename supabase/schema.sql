@@ -140,6 +140,44 @@ create table if not exists media_library (
   constraint media_library_status_check check (status in ('draft', 'saved', 'approved', 'used', 'archived'))
 );
 
+create table if not exists gold_standard_examples (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  title text not null,
+  platform text,
+  topic text,
+  subtopic text,
+  audience text,
+  content_type text,
+  hook text,
+  full_content text not null,
+  cta text,
+  tags text[] default '{}',
+  collection text,
+  why_gold_standard text,
+  notes text,
+  status text default 'approved',
+  metadata jsonb default '{}'::jsonb,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  constraint gold_standard_examples_status_check check (status in ('draft', 'approved', 'archived'))
+);
+
+create index if not exists gold_standard_examples_user_idx
+on gold_standard_examples(user_id);
+
+create index if not exists gold_standard_examples_user_topic_idx
+on gold_standard_examples(user_id, topic);
+
+create index if not exists gold_standard_examples_user_platform_idx
+on gold_standard_examples(user_id, platform);
+
+create index if not exists gold_standard_examples_user_content_type_idx
+on gold_standard_examples(user_id, content_type);
+
+create index if not exists gold_standard_examples_tags_idx
+on gold_standard_examples using gin(tags);
+
 create table if not exists content_packs (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -454,6 +492,11 @@ create trigger media_library_updated_at
 before update on media_library
 for each row execute procedure set_updated_at();
 
+drop trigger if exists gold_standard_examples_updated_at on gold_standard_examples;
+create trigger gold_standard_examples_updated_at
+before update on gold_standard_examples
+for each row execute procedure set_updated_at();
+
 drop trigger if exists content_packs_updated_at on content_packs;
 create trigger content_packs_updated_at
 before update on content_packs
@@ -484,6 +527,7 @@ alter table brand_brains enable row level security;
 alter table generated_content enable row level security;
 alter table content_opportunities enable row level security;
 alter table media_library enable row level security;
+alter table gold_standard_examples enable row level security;
 alter table content_packs enable row level security;
 alter table canva_templates enable row level security;
 alter table content_calendar_plans enable row level security;
@@ -519,6 +563,12 @@ with check (auth.uid() = user_id);
 drop policy if exists "Users can manage their media library" on media_library;
 create policy "Users can manage their media library"
 on media_library for all
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+drop policy if exists "Users can manage their gold standard examples" on gold_standard_examples;
+create policy "Users can manage their gold standard examples"
+on gold_standard_examples for all
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
 

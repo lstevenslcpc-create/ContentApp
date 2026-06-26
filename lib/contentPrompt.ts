@@ -3,9 +3,10 @@ import type { FrameworkBrief } from "./psychologyFrameworkEngine";
 import type { ExampleBrief } from "./realLifeExampleEngine";
 import type { TherapistInsightBrief } from "./therapistInsightEngine";
 import type { TherapistObservationBrief } from "./therapistObservationEngine";
-import type { BrandBrain, BusinessProfile, ContentGenerationRequest, ContentIntelligenceBrief } from "./types";
+import type { BrandBrain, BusinessProfile, ContentGenerationRequest, ContentIntelligenceBrief, GoldStandardExample } from "./types";
 import { formatCompactBrandBrainForPrompt } from "./brandBrain/format";
 import { formatContentGoalForPrompt } from "./contentGoalConfig";
+import { formatGoldStandardExamplesForPrompt } from "./goldStandardLibrary";
 import { applyLionHeartVoiceGuidance } from "./lionheartVoiceLibrary";
 import { topicFidelityInstruction } from "./topicFidelity";
 
@@ -165,7 +166,7 @@ Every post must include at least one authentic therapist observation from its as
 `;
 }
 
-export function buildContentPrompt(profile: BusinessProfile, request: ContentGenerationRequest, brandBrain?: BrandBrain | null, researchBrief?: ContentIntelligenceBrief | null, plannedAngles: ContentAngle[] = [], frameworkBriefs: FrameworkBrief[] = [], exampleBriefs: ExampleBrief[] = [], therapistInsightBriefs: TherapistInsightBrief[] = [], therapistObservationBriefs: TherapistObservationBrief[] = []) {
+export function buildContentPrompt(profile: BusinessProfile, request: ContentGenerationRequest, brandBrain?: BrandBrain | null, researchBrief?: ContentIntelligenceBrief | null, plannedAngles: ContentAngle[] = [], frameworkBriefs: FrameworkBrief[] = [], exampleBriefs: ExampleBrief[] = [], therapistInsightBriefs: TherapistInsightBrief[] = [], therapistObservationBriefs: TherapistObservationBrief[] = [], goldStandardExamples: GoldStandardExample[] = []) {
   return `
 You are an expert small-business content strategist. Generate ${request.numberOfPosts} ready-to-review ${request.contentType} idea(s) for ${request.platform}.
 
@@ -221,6 +222,8 @@ Build the content pack around this brief. Keep each post distinct, but make the 
 ` : ""}
 
 ${formatCompactBrandBrainForPrompt(brandBrain)}
+
+${formatGoldStandardExamplesForPrompt(goldStandardExamples)}
 
 Content rules:
 - The LionHeart Voice Library is the primary writing authority. Do not treat it as optional context.

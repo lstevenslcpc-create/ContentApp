@@ -505,6 +505,28 @@ export type ContentGenerationRequest = {
   };
 };
 
+export type GoldStandardExample = {
+  id: string;
+  user_id: string;
+  title: string;
+  platform?: string | null;
+  topic?: string | null;
+  subtopic?: string | null;
+  audience?: string | null;
+  content_type?: string | null;
+  hook?: string | null;
+  full_content: string;
+  cta?: string | null;
+  tags?: string[];
+  collection?: string | null;
+  why_gold_standard?: string | null;
+  notes?: string | null;
+  status?: "draft" | "approved" | "archived";
+  metadata?: Record<string, unknown>;
+  created_at?: string;
+  updated_at?: string;
+};
+
 export type MediaGenerationRequest = {
   contentId?: string;
   prompt: string;

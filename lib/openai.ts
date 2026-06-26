@@ -584,7 +584,7 @@ function qualityChecklist(post: GeneratedPost, request: ContentGenerationRequest
   };
 }
 
-export async function generateStructuredContent(profile: BusinessProfile, request: ContentGenerationRequest, brandBrain?: BrandBrain | null, plannedAnglesOverride?: ContentAngle[]): Promise<GeneratedPost[]> {
+export async function generateStructuredContent(profile: BusinessProfile, request: ContentGenerationRequest, brandBrain?: BrandBrain | null, plannedAnglesOverride?: ContentAngle[], goldStandardExamples: import("./types").GoldStandardExample[] = []): Promise<GeneratedPost[]> {
   if (!process.env.OPENAI_API_KEY) {
     throw new Error("OPENAI_API_KEY is missing. Add it to generate content.");
   }
@@ -597,7 +597,7 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
   const exampleBriefs = plannedAngles.map((angle) => buildExampleBrief(request.topic, angle.name, request.contentGoal));
   const therapistInsightBriefs = plannedAngles.map((angle) => buildTherapistInsightBrief(request.topic, angle.name, request.contentGoal));
   const therapistObservationBriefs = plannedAngles.map((angle) => buildTherapistObservationBrief(request.topic, angle.name, request.contentGoal));
-  const prompt = buildContentPrompt(profile, request, brandBrain, researchBrief, plannedAngles, frameworkBriefs, exampleBriefs, therapistInsightBriefs, therapistObservationBriefs);
+  const prompt = buildContentPrompt(profile, request, brandBrain, researchBrief, plannedAngles, frameworkBriefs, exampleBriefs, therapistInsightBriefs, therapistObservationBriefs, goldStandardExamples);
   const client = await createOpenAiClient(process.env.OPENAI_API_KEY);
 
   async function runGeneration(userPrompt: string) {

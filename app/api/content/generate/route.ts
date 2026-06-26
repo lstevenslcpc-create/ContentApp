@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { authErrorResponse, requireApiUser } from "@/lib/auth";
 import { selectAnglesForGeneration } from "@/lib/contentAngles";
+import { getRelevantGoldStandardExamples } from "@/lib/goldStandardLibrary";
 import { generateStructuredContent } from "@/lib/openai";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import type { BusinessProfile, BrandBrain, ContentGenerationRequest } from "@/lib/types";
@@ -57,7 +58,21 @@ async function generateAndSaveBatch({
     plannedAngles: plannedAngles.map((angle) => angle.name)
   });
 
-  const posts = await generateStructuredContent(profile, { ...body, topic, numberOfPosts, angleOffset }, brandBrain, plannedAngles);
+  const goldStandardExamples = await getRelevantGoldStandardExamples(supabase, {
+    userId,
+    topic,
+    audience: profile.target_audience,
+    platform: body.platform,
+    contentType: body.contentType,
+    limit: 5
+  });
+  console.info("[content-generate][gold-standard-examples]", {
+    topic,
+    count: goldStandardExamples.length,
+    titles: goldStandardExamples.map((example) => example.title)
+  });
+
+  const posts = await generateStructuredContent(profile, { ...body, topic, numberOfPosts, angleOffset }, brandBrain, plannedAngles, goldStandardExamples);
   console.info("[content-generate][batch-generated]", {
     topic,
     numberOfPosts,
