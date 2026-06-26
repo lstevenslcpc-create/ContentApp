@@ -21,6 +21,7 @@ import {
   Wand2
 } from "lucide-react";
 import { authedFetch } from "@/lib/apiClient";
+import type { CreativeBrief } from "@/lib/creativeDirector";
 import type { ContentCalendarPlan, ContentOpportunity, ContentPack, MediaLibraryAsset } from "@/lib/types";
 import { WorkflowStatusBar } from "@/components/WorkflowStatusBar";
 
@@ -249,6 +250,9 @@ export function WorkspaceClient() {
   const [outputType, setOutputType] = useState("carousel");
   const [creating, setCreating] = useState(false);
   const [createdPack, setCreatedPack] = useState<CreatedPack | null>(null);
+  const [createdPacks, setCreatedPacks] = useState<CreatedPack[]>([]);
+  const [creativeBrief, setCreativeBrief] = useState<CreativeBrief | null>(null);
+  const [editingBrief, setEditingBrief] = useState(false);
   const [message, setMessage] = useState("");
   const [campaignOffer, setCampaignOffer] = useState("Teen Anxiety Workbook");
   const [campaignGoal, setCampaignGoal] = useState("product sales");
@@ -272,7 +276,7 @@ export function WorkspaceClient() {
     setSelectedPlatforms((current) => current.includes(platform) ? current.filter((item) => item !== platform) : [...current, platform]);
   }
 
-  async function createIdeaPack() {
+  async function createCreativeBrief() {
     if (!idea.trim()) {
       setMessage("Add one clear idea first.");
       return;
@@ -281,24 +285,59 @@ export function WorkspaceClient() {
     setCreating(true);
     setMessage("");
     setCreatedPack(null);
+    setCreatedPacks([]);
 
-    const response = await authedFetch("/api/content-packs", {
+    const response = await authedFetch("/api/creative-director", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        opportunity: buildOpportunity({ idea, goal, mission, selectedPlatforms: currentPlatforms, outputType })
+        action: "brief",
+        idea,
+        mission
       })
     });
     const data = await response.json();
     setCreating(false);
 
     if (!response.ok || !data.ok) {
-      setMessage(data.error || "Unable to create content pack.");
+      setMessage(data.error || "Unable to create Creative Brief.");
+      return;
+    }
+
+    setCreativeBrief(data.brief);
+    setMessage("Creative Brief ready.");
+  }
+
+  async function generateFromBrief() {
+    if (!creativeBrief) {
+      await createCreativeBrief();
+      return;
+    }
+
+    setCreating(true);
+    setMessage("");
+    const response = await authedFetch("/api/creative-director", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "generate",
+        idea,
+        brief: creativeBrief
+      })
+    });
+    const data = await response.json();
+    setCreating(false);
+
+    if (!response.ok || !data.ok) {
+      setMessage(data.error || "Unable to generate from Creative Brief.");
       return;
     }
 
     setCreatedPack({ id: data.pack.id, title: data.pack.title });
-    setMessage("Content Pack created.");
+    setCreatedPacks([{ id: data.pack.id, title: data.pack.title }]);
+    setMessage("Content Pack created and moved to Approval Review.");
+    setCreativeBrief(null);
+    setEditingBrief(false);
     loadSummary();
   }
 
@@ -373,9 +412,47 @@ export function WorkspaceClient() {
     setCreating(false);
     if (created.length) {
       setCreatedPack(created[0]);
+      setCreatedPacks(created);
       setMessage(`${created.length} Content Pack${created.length === 1 ? "" : "s"} created.`);
       loadSummary();
     }
+  }
+
+  async function generateMyWeek() {
+    const weeklyFocus = campaignOffer.trim() || idea.trim();
+    if (!weeklyFocus) {
+      setMessage("Add a weekly focus first.");
+      return;
+    }
+
+    setCreating(true);
+    setMessage("");
+    setCreatedPack(null);
+    setCreatedPacks([]);
+
+    const response = await authedFetch("/api/creative-director", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "week",
+        weeklyFocus,
+        productOrService: campaignOffer,
+        desiredPosts: Math.max(1, campaignIdeas.filter((item) => item.selected).length || 7)
+      })
+    });
+    const data = await response.json();
+    setCreating(false);
+
+    if (!response.ok || !data.ok) {
+      setMessage(data.error || "Unable to generate weekly plan.");
+      return;
+    }
+
+    const packs = Array.isArray(data.packs) ? data.packs.map((pack: ContentPack) => ({ id: pack.id, title: pack.title })) : [];
+    setCreatedPacks(packs);
+    setCreatedPack(packs[0] || null);
+    setMessage(`${packs.length} weekly Content Packs created and moved to Approval Review.`);
+    loadSummary();
   }
 
   return (
@@ -494,9 +571,9 @@ export function WorkspaceClient() {
                   {outputTypes.map((item) => <option key={item}>{item}</option>)}
                 </select>
               </Field>
-              <button className="btn-primary w-full justify-center" onClick={createIdeaPack} disabled={creating}>
+              <button className="btn-primary w-full justify-center" onClick={createCreativeBrief} disabled={creating}>
                 {creating ? <Loader2 className="animate-spin" size={16} /> : <Wand2 size={16} />}
-                Create Content Pack
+                Create Creative Brief
               </button>
             </div>
           ) : (
@@ -528,6 +605,10 @@ export function WorkspaceClient() {
                 Refresh Campaign Ideas
                 <RefreshCw size={16} />
               </button>
+              <button className="btn-primary w-full justify-center" onClick={generateMyWeek} disabled={creating}>
+                {creating ? <Loader2 className="animate-spin" size={16} /> : <CalendarDays size={16} />}
+                Generate My Week
+              </button>
               <button className="btn-primary w-full justify-center" onClick={createSelectedCampaignPacks} disabled={creating || !campaignIdeas.length}>
                 {creating ? <Loader2 className="animate-spin" size={16} /> : <PackagePlus size={16} />}
                 Create Selected Content Packs
@@ -538,10 +619,11 @@ export function WorkspaceClient() {
           {message ? (
             <div className="mt-5 rounded-2xl border border-[#d8cbb8] bg-[#fffdf8] p-4 text-sm font-semibold leading-6 text-[#172a3a]">
               {message}
-              {createdPack ? (
+              {createdPacks.length ? (
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <Link href={`/content-packs/${createdPack.id}`} className="btn-secondary">Open Content Pack</Link>
+                  {createdPack ? <Link href={`/content-packs/${createdPack.id}`} className="btn-secondary">Open First Content Pack</Link> : null}
                   <Link href="/approval-review" className="btn-secondary">Open in Approval Review</Link>
+                  <Link href="/content-calendar" className="btn-secondary">Open Calendar</Link>
                 </div>
               ) : null}
             </div>
@@ -549,7 +631,86 @@ export function WorkspaceClient() {
         </div>
 
         <div className="rounded-[2rem] border border-[#eadfc8] bg-white/90 p-5 shadow-sm lg:p-6">
-          {mode === "campaign" ? (
+          {mode === "idea" && creativeBrief ? (
+            <div className="space-y-4">
+              <SectionHeader title="Creative Brief" description="Review the strategy before the app creates the Content Pack." />
+              <div className="mt-5 rounded-2xl border border-[#d8cbb8] bg-[#fffdf8] p-5">
+                <div className="grid gap-3 md:grid-cols-2">
+                  {[
+                    ["Primary Platform", creativeBrief.primaryPlatform],
+                    ["Supporting Platforms", creativeBrief.supportingPlatforms.join(", ")],
+                    ["Story Framework", creativeBrief.storyFramework],
+                    ["Supporting Framework", creativeBrief.supportingFramework],
+                    ["Emotional Destination", creativeBrief.emotionalDestination],
+                    ["Content Mission", creativeBrief.contentMission],
+                    ["Suggested CTA", creativeBrief.suggestedCta],
+                    ["Suggested Canva Template", creativeBrief.recommendedCanvaTemplate.name],
+                    ["Gold Standards Used", String(creativeBrief.goldStandardsUsed)],
+                    ["Voice Confidence", `${creativeBrief.voiceConfidence}%`],
+                    ["Topic Confidence", `${creativeBrief.topicConfidence}%`]
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-xl bg-white p-3 ring-1 ring-[#eadfc8]">
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-[#77633c]">{label}</p>
+                      <p className="mt-1 text-sm font-bold leading-6 text-[#172a3a]">{value}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 rounded-xl bg-white p-4 ring-1 ring-[#eadfc8]">
+                  <p className="text-xs font-bold uppercase tracking-wide text-[#77633c]">Why these choices</p>
+                  <div className="mt-3 grid gap-2 text-sm leading-6 text-[#6f766f]">
+                    <p><strong>Platform:</strong> {creativeBrief.why.primaryPlatform}</p>
+                    <p><strong>Framework:</strong> {creativeBrief.why.storyFramework}</p>
+                    <p><strong>Template:</strong> {creativeBrief.why.canvaTemplate}</p>
+                    <p><strong>Schedule:</strong> {creativeBrief.scheduleRecommendation.day} at {creativeBrief.scheduleRecommendation.time}. {creativeBrief.scheduleRecommendation.reason}</p>
+                  </div>
+                </div>
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <div className="rounded-xl bg-white p-4 ring-1 ring-[#eadfc8]">
+                    <p className="text-xs font-bold uppercase tracking-wide text-[#77633c]">AI image prompt</p>
+                    <p className="mt-2 text-sm leading-6 text-[#6f766f]">{creativeBrief.aiImagePrompt}</p>
+                  </div>
+                  <div className="rounded-xl bg-white p-4 ring-1 ring-[#eadfc8]">
+                    <p className="text-xs font-bold uppercase tracking-wide text-[#77633c]">Platform angles</p>
+                    <p className="mt-2 text-sm leading-6 text-[#6f766f]"><strong>Reel:</strong> {creativeBrief.reelAngle}</p>
+                    <p className="mt-2 text-sm leading-6 text-[#6f766f]"><strong>Pinterest:</strong> {creativeBrief.pinterestAngle}</p>
+                    <p className="mt-2 text-sm leading-6 text-[#6f766f]"><strong>Email:</strong> {creativeBrief.emailAngle}</p>
+                  </div>
+                </div>
+                {editingBrief ? (
+                  <div className="mt-4 grid gap-3 md:grid-cols-2">
+                    <Field label="Primary Platform">
+                      <input className="field mt-1" value={creativeBrief.primaryPlatform} onChange={(event) => setCreativeBrief({ ...creativeBrief, primaryPlatform: event.target.value })} />
+                    </Field>
+                    <Field label="Content Mission">
+                      <input className="field mt-1" value={creativeBrief.contentMission} onChange={(event) => setCreativeBrief({ ...creativeBrief, contentMission: event.target.value })} />
+                    </Field>
+                    <Field label="CTA">
+                      <input className="field mt-1" value={creativeBrief.suggestedCta} onChange={(event) => setCreativeBrief({ ...creativeBrief, suggestedCta: event.target.value })} />
+                    </Field>
+                    <Field label="Emotional Destination">
+                      <input className="field mt-1" value={creativeBrief.emotionalDestination} onChange={(event) => setCreativeBrief({ ...creativeBrief, emotionalDestination: event.target.value })} />
+                    </Field>
+                  </div>
+                ) : null}
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <button className="btn-primary" onClick={generateFromBrief} disabled={creating}>
+                    {creating ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} />}
+                    Generate
+                  </button>
+                  <button className="btn-secondary" onClick={() => setEditingBrief((current) => !current)}>
+                    Edit Brief
+                  </button>
+                  <button className="btn-secondary" onClick={() => {
+                    setCreativeBrief(null);
+                    setEditingBrief(false);
+                    setMessage("");
+                  }}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : mode === "campaign" ? (
             <div>
               <SectionHeader title="Product/Service Campaign Ideas" description="Select the ideas you want to turn into real Content Packs." />
               {!campaignIdeas.length ? (
