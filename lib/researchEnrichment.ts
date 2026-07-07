@@ -1,3 +1,5 @@
+import { getResearchModel, logModelFallback, logModelSelection } from "./modelRouter";
+
 export type ResearchProviderId = "openai" | "perplexity" | "gemini" | "claude" | "trusted_web" | "future_web_api";
 
 export type ResearchSourceType =
@@ -142,24 +144,30 @@ async function fetchTrustedSourceText(source: TrustedSource) {
 async function summarizeWithOpenAi(input: ResearchEnrichmentInput, source: TrustedSource, sourceText: string) {
   if (!process.env.OPENAI_API_KEY || !sourceText) return null;
 
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      model: process.env.OPENAI_MODEL || "gpt-4o-mini",
-      temperature: 0.1,
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "system",
-          content: "Return strict JSON. Summarize only from the provided source excerpt. Do not invent citations, statistics, URLs, authors, dates, or claims. If the excerpt does not support a finding, return an empty findings array."
-        },
-        {
-          role: "user",
-          content: `
+  const route = getResearchModel();
+  logModelSelection(route);
+  let response: Response | null = null;
+
+  for (let index = 0; index < route.candidates.length; index += 1) {
+    const model = route.candidates[index];
+    response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0.1,
+        response_format: { type: "json_object" },
+        messages: [
+          {
+            role: "system",
+            content: "Return strict JSON. Summarize only from the provided source excerpt. Do not invent citations, statistics, URLs, authors, dates, or claims. If the excerpt does not support a finding, return an empty findings array."
+          },
+          {
+            role: "user",
+            content: `
 Topic: ${input.topic}
 Audience: ${input.audience || "not specified"}
 Source name: ${source.name}
@@ -180,12 +188,16 @@ Return JSON:
   ]
 }
 `
-        }
-      ]
-    })
-  });
+          }
+        ]
+      })
+    });
 
-  if (!response.ok) return null;
+    if (response.ok) break;
+    logModelFallback(route, model, route.candidates[index + 1]);
+  }
+
+  if (!response?.ok) return null;
   const json = await response.json() as { choices?: Array<{ message?: { content?: string | null } }> };
   const content = json.choices?.[0]?.message?.content;
   if (!content) return null;

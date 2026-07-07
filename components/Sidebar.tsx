@@ -43,6 +43,7 @@ const navGroups = [
       { href: "/scheduled-posts", label: "Scheduled", icon: Clapperboard },
       { href: "/social-accounts", label: "Social Accounts", icon: Plug },
       { href: "/analytics", label: "Analytics", icon: BarChart3 },
+      { href: "/model-settings", label: "Model Settings", icon: Settings },
       { href: "/settings", label: "Settings", icon: Settings }
     ]
   }

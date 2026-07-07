@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { authErrorResponse, requireApiUser } from "@/lib/auth";
+import { getJsonExtractionModel, logModelFallback, logModelSelection } from "@/lib/modelRouter";
 
 function fallbackExtract(raw: string) {
   const lines = raw.split(/\n/).map((line) => line.trim()).filter(Boolean);
@@ -38,14 +39,21 @@ export async function POST(request: Request) {
 
     try {
       const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-      const completion = await client.chat.completions.create({
-        model: process.env.OPENAI_MODEL || "gpt-4o-mini",
-        temperature: 0.25,
-        max_tokens: 2200,
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: "Return only valid JSON. Extract editable metadata for Gold Standard Library imports. Do not rewrite the posts." },
-          { role: "user", content: `
+      const route = getJsonExtractionModel();
+      logModelSelection(route);
+      let completion: Awaited<ReturnType<typeof client.chat.completions.create>> | null = null;
+
+      for (let index = 0; index < route.candidates.length; index += 1) {
+        const model = route.candidates[index];
+        try {
+          completion = await client.chat.completions.create({
+            model,
+            temperature: 0.25,
+            max_tokens: 2200,
+            response_format: { type: "json_object" },
+            messages: [
+              { role: "system", content: "Return only valid JSON. Extract editable metadata for Gold Standard Library imports. Do not rewrite the posts." },
+              { role: "user", content: `
 For each post, suggest metadata fields for a LionHeart Therapy Gold Standard Library import.
 Return JSON:
 {
@@ -73,8 +81,16 @@ Return JSON:
 Posts:
 ${posts.map((post, index) => `POST ${index + 1}\n${post}`).join("\n\n---\n\n")}
 ` }
-        ]
-      });
+            ]
+          });
+          break;
+        } catch (error) {
+          logModelFallback(route, model, route.candidates[index + 1]);
+          if (index === route.candidates.length - 1) throw error;
+        }
+      }
+
+      if (!completion) throw new Error("OpenAI extraction did not return a response.");
       const raw = completion.choices[0]?.message?.content || "{}";
       const result = JSON.parse(raw) as { entries?: unknown[] };
       const entries = Array.isArray(result.entries) ? result.entries : posts.map(fallbackExtract);

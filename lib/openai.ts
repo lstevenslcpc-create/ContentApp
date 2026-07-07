@@ -10,6 +10,7 @@ import { buildTherapistInsightBrief } from "./therapistInsightEngine";
 import { buildTherapistObservationBrief } from "./therapistObservationEngine";
 import { applyLionHeartVoiceGuidance, LIONHEART_MINIMUM_VOICE_SCORE, scoreLionHeartVoice } from "./lionheartVoiceLibrary";
 import { buildLionHeartEditorialPrompt, enforceEditorialBasics, scoreLionHeartEditorialDraft } from "./lionheartEditorialEngine";
+import { getContentPackModel, getContentRepurposingModel, getCreativeDirectorModel, getFallbackModel, getVoiceRewriteModel, logModelFallback, logModelSelection, type ModelRoute } from "./modelRouter";
 import { selectStoryFramework } from "./storyFrameworks";
 import { assessTopicFidelity, attachmentTopicRepairCopy, generalTopicRepairCopy, topicFidelityInstruction } from "./topicFidelity";
 
@@ -96,6 +97,7 @@ type SafeOpenAiError = {
 };
 
 type ChatCompletionParams = Parameters<OpenAI["chat"]["completions"]["create"]>[0];
+type RoutedChatCompletionParams = Omit<ChatCompletionParams, "model"> & { model?: string };
 
 type OpenAiGenerationDebug = {
   checkpoint?: string;
@@ -208,12 +210,8 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: str
   }
 }
 
-function modelCandidates() {
-  return Array.from(new Set([
-    process.env.OPENAI_MODEL,
-    "gpt-4o-mini",
-    "gpt-4o"
-  ].filter(Boolean) as string[]));
+function modelCandidates(route: ModelRoute = getFallbackModel()) {
+  return route.candidates;
 }
 
 async function minimalOpenAiTest(client: OpenAI, model: string) {
@@ -231,7 +229,7 @@ async function minimalOpenAiTest(client: OpenAI, model: string) {
   );
 }
 
-async function createJsonCompletion(client: OpenAI, params: ChatCompletionParams, model: string, useResponseFormat: boolean) {
+async function createJsonCompletion(client: OpenAI, params: RoutedChatCompletionParams, model: string, useResponseFormat: boolean) {
   const request = {
     ...params,
     model,
@@ -250,7 +248,36 @@ async function createOpenAiClient(apiKey: string): Promise<OpenAI> {
   return new OpenAIClient({ apiKey });
 }
 
-async function directFetchChatCompletion(apiKey: string, params: ChatCompletionParams, model: string, useResponseFormat: boolean): Promise<NonStreamingCompletion> {
+async function createCompletionWithFallback(
+  client: OpenAI,
+  route: ModelRoute,
+  params: RoutedChatCompletionParams,
+  timeoutMs: number,
+  label: string
+) {
+  logModelSelection(route);
+  const errors: SafeOpenAiError[] = [];
+
+  for (let index = 0; index < route.candidates.length; index += 1) {
+    const model = route.candidates[index];
+    try {
+      const completion = await withTimeout(
+        client.chat.completions.create({ ...params, model }),
+        timeoutMs,
+        `${label} for ${model}`
+      );
+      return { completion: completion as NonStreamingCompletion, model };
+    } catch (error) {
+      const safe = logOpenAiError(`[openai][${route.feature}][model-failed]`, error);
+      errors.push(safe);
+      logModelFallback(route, model, route.candidates[index + 1]);
+    }
+  }
+
+  throw new Error(`${label} failed for all configured models: ${errors.map((error) => error.message).join(" | ")}`);
+}
+
+async function directFetchChatCompletion(apiKey: string, params: RoutedChatCompletionParams, model: string, useResponseFormat: boolean): Promise<NonStreamingCompletion> {
   const response = await withTimeout(
     fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -298,7 +325,7 @@ async function directFetchMinimalTest(apiKey: string, model: string) {
       messages: [
         { role: "user", content: "Reply with one short sentence confirming the connection works." }
       ]
-    } as ChatCompletionParams,
+    } as RoutedChatCompletionParams,
     model,
     false
   );
@@ -615,11 +642,14 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
   };
   const prompt = buildContentPrompt(profile, request, brandBrain, researchBrief, plannedAngles, frameworkBriefs, exampleBriefs, therapistInsightBriefs, therapistObservationBriefs, goldStandardExamples, storyFrameworkSelection);
   const client = await createOpenAiClient(process.env.OPENAI_API_KEY);
+  const contentRoute = getContentRepurposingModel();
+  const voiceRoute = getVoiceRewriteModel();
 
   async function runGeneration(userPrompt: string) {
-    const completion = await withTimeout(
-      client.chat.completions.create({
-        model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+    const { completion } = await createCompletionWithFallback(
+      client,
+      contentRoute,
+      {
         temperature: 0.75,
         max_tokens: Math.min(3600, Math.max(1600, 1800 * (request.numberOfPosts || 1))),
         response_format: { type: "json_object" },
@@ -627,7 +657,7 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
           { role: "system", content: "Return only valid JSON. Do not include markdown." },
           { role: "user", content: userPrompt }
         ]
-      }),
+      },
       18000,
       "OpenAI content generation"
     );
@@ -645,9 +675,10 @@ export async function generateStructuredContent(profile: BusinessProfile, reques
   }
 
   async function rewriteForLionHeartVoice(post: GeneratedPost, voiceScore: ReturnType<typeof scoreLionHeartVoice>) {
-    const completion = await withTimeout(
-      client.chat.completions.create({
-        model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+    const { completion } = await createCompletionWithFallback(
+      client,
+      voiceRoute,
+      {
         temperature: 0.62,
         max_tokens: 1200,
         response_format: { type: "json_object" },
@@ -712,7 +743,7 @@ Return JSON only:
 `
           }
         ]
-      }),
+      },
       16000,
       "LionHeart voice rewrite"
     );
@@ -763,9 +794,10 @@ Return JSON only:
       }) as GeneratedPost;
     }
 
-    const completion = await withTimeout(
-      client.chat.completions.create({
-        model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+    const { completion } = await createCompletionWithFallback(
+      client,
+      voiceRoute,
+      {
         temperature: 0.55,
         max_tokens: 1100,
         response_format: { type: "json_object" },
@@ -785,7 +817,7 @@ Return JSON only:
             })
           }
         ]
-      }),
+      },
       16000,
       "LionHeart editorial pass"
     );
@@ -1364,14 +1396,15 @@ export async function generateContentPack(opportunity: ContentOpportunity, brand
   }
 
   const client = await createOpenAiClient(apiKey);
-  const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
+  const route = getContentPackModel();
   const focusInstruction = sectionFocus
     ? `Regenerate with special attention to this section: ${sectionFocus}. Still return the full JSON object.`
     : "Generate the full content pack.";
 
-  const completion = await withTimeout(
-    client.chat.completions.create({
-      model,
+  const { completion, model } = await createCompletionWithFallback(
+    client,
+    route,
+    {
       temperature: 0.78,
       response_format: { type: "json_object" },
       messages: [
@@ -1430,9 +1463,9 @@ Return strict JSON only with this exact shape:
 `
         }
       ]
-    }),
+    },
     45000,
-    `OpenAI content pack generation for ${model}`
+    "OpenAI content pack generation"
   );
 
   const raw = completion.choices[0]?.message?.content;
@@ -1510,8 +1543,9 @@ export async function generateContentOpportunities(theme: string, brandBrain?: B
     openAiDebug.openAiErrorCode = safe.code;
   }
 
-  const baseParams: ChatCompletionParams = {
-    model: "gpt-4o-mini",
+  const route = getCreativeDirectorModel();
+  const baseParams: RoutedChatCompletionParams = {
+    model: route.model,
       temperature: 0.82,
       messages: [
         {
@@ -1640,7 +1674,8 @@ Make the ideas specific to therapy, clinical safety, LionHeart Therapy, products
 
   const errors: SafeOpenAiError[] = [];
 
-  for (const model of modelCandidates()) {
+  logModelSelection(route);
+  for (const model of modelCandidates(route)) {
     openAiDebug.modelUsed = model;
 
     if (client) {

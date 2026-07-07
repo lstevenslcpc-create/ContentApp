@@ -1,6 +1,7 @@
 import type { BrandBrain, ContentPack, ContentPackSectionKey, GeneratedContent } from "./types";
 import { formatCompactBrandBrainForPrompt } from "./brandBrain/format";
 import { applyLionHeartVoiceGuidance } from "./lionheartVoiceLibrary";
+import { getCanvaBriefModel, getContentRepurposingModel, logModelFallback, logModelSelection } from "./modelRouter";
 import { assessTopicFidelity, attachmentTopicRepairCopy, topicFidelityInstruction } from "./topicFidelity";
 
 export type ContentImproveAction =
@@ -119,19 +120,36 @@ async function createOpenAiJson(userPrompt: string, maxTokens = 700) {
 
   const { default: OpenAIClient } = await import("openai");
   const client = new OpenAIClient({ apiKey });
-  const response = await client.chat.completions.create({
-    model: process.env.OPENAI_MODEL || "gpt-4o-mini",
-    temperature: 0.58,
-    max_tokens: maxTokens,
-    response_format: { type: "json_object" },
-    messages: [
-      {
-        role: "system",
-        content: "Return only valid JSON. You are editing LionHeart Therapy content. Preserve clinical safety, warmth, and specificity. Avoid em dashes completely. Do not use —."
-      },
-      { role: "user", content: userPrompt }
-    ]
-  }) as ChatJson;
+  const route = maxTokens <= 600 ? getCanvaBriefModel() : getContentRepurposingModel();
+  logModelSelection(route);
+  let response: ChatJson | null = null;
+  const errors: string[] = [];
+  for (let index = 0; index < route.candidates.length; index += 1) {
+    const model = route.candidates[index];
+    try {
+      response = await client.chat.completions.create({
+        model,
+        temperature: 0.58,
+        max_tokens: maxTokens,
+        response_format: { type: "json_object" },
+        messages: [
+          {
+            role: "system",
+            content: "Return only valid JSON. You are editing LionHeart Therapy content. Preserve clinical safety, warmth, and specificity. Avoid em dashes completely. Do not use —."
+          },
+          { role: "user", content: userPrompt }
+        ]
+      }) as ChatJson;
+      break;
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : "OpenAI targeted edit failed.");
+      logModelFallback(route, model, route.candidates[index + 1]);
+    }
+  }
+
+  if (!response) {
+    throw new Error(`OpenAI targeted editing failed for all configured models: ${errors.join(" | ")}`);
+  }
 
   const raw = response.choices?.[0]?.message?.content;
   if (!raw) throw new Error("OpenAI returned an empty targeted editing response.");
