@@ -36,6 +36,20 @@ export type WeeklyAuthorityInput = {
   suggestedPublishDate: string;
 };
 
+export type SuggestedBlogTopic = {
+  blogTitle: string;
+  blogTopic: string;
+  primaryKeyword: string;
+  secondaryKeywords: string[];
+  targetAudience: string;
+  whyWorthPublishingNow: string;
+  bestCta: string;
+  estimatedAssetOutput: string;
+  shopifyBlogCategory: string;
+  businessGoal: string;
+  ctaFocus: string;
+};
+
 export type BlogCreativeBrief = {
   seoTitleOptions: string[];
   shopifyBlogTitle: string;
@@ -351,6 +365,38 @@ Return JSON only:
     "shopifyTags": ["..."],
     "shopifyPublishingChecklist": ["..."]
   }
+}
+`
+  });
+}
+
+export async function generateWeeklyBlogIdeas(context: Context) {
+  return callJsonModel<{ ideas: SuggestedBlogTopic[] }>({
+    route: getContentRepurposingModel(),
+    system: baseSystemPrompt(context),
+    maxTokens: 2400,
+    user: `
+Suggest exactly 3 Shopify blog topics for this week for LionHeart Therapy.
+The topics should support SEO authority, Pinterest discovery, trust building, and product/service CTA opportunities.
+Do not write the full blog. Do not mention WordPress.
+
+Return JSON only:
+{
+  "ideas": [
+    {
+      "blogTitle": "...",
+      "blogTopic": "...",
+      "primaryKeyword": "...",
+      "secondaryKeywords": ["..."],
+      "targetAudience": "...",
+      "whyWorthPublishingNow": "...",
+      "bestCta": "Teen workbook, therapy services, email list, product, freebie, or related blog",
+      "estimatedAssetOutput": "1 Shopify blog, 1 YouTube video, 5 short videos, 1 carousel, 3 Pinterest pins, 1 email, 2 to 3 Threads posts, 1 Facebook post",
+      "shopifyBlogCategory": "...",
+      "businessGoal": "therapy referrals, teen workbook sales, email list growth, Pinterest traffic, SEO traffic, or trust building",
+      "ctaFocus": "therapy services, teen workbook, freebie, email list, product, or related blog"
+    }
+  ]
 }
 `
   });

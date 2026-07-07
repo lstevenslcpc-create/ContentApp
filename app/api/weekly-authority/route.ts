@@ -5,6 +5,7 @@ import {
   analyzeClaudeDraft,
   generateBlogCreativeBrief,
   generateClaudePrompt,
+  generateWeeklyBlogIdeas,
   generateWeeklyAssets,
   loadWeeklyAuthorityContext,
   weeklyAssetsToContentPack,
@@ -243,6 +244,12 @@ export async function POST(request: Request) {
     const action = String(body.action || "plan");
     const supabase = getSupabaseAdmin();
 
+    if (action === "suggest-topics") {
+      const context = await loadWeeklyAuthorityContext(supabase, user.id, "weekly Shopify blog ideas");
+      const { ideas } = await generateWeeklyBlogIdeas(context);
+      return NextResponse.json({ ok: true, ideas });
+    }
+
     if (action === "plan") {
       const input = normalizeInput(body);
       if (!input.blogTopic) return NextResponse.json({ ok: false, error: "Blog topic is required." }, { status: 400 });
@@ -326,6 +333,23 @@ export async function POST(request: Request) {
       });
       await upsertCompanionRows(projectId, user.id, { assets, contentPackId: pack.id });
       return NextResponse.json({ ok: true, project: updated, assets, contentPack: pack });
+    }
+
+    if (action === "update-checklist") {
+      const currentMetadata = typeof project.shopify_metadata === "object" && project.shopify_metadata ? project.shopify_metadata as Record<string, unknown> : {};
+      const updatedMetadata = {
+        ...currentMetadata,
+        checklistCompletion: body.checklistCompletion && typeof body.checklistCompletion === "object" ? body.checklistCompletion : {}
+      };
+      const { data, error } = await supabase
+        .from("weekly_authority_projects")
+        .update({ shopify_metadata: updatedMetadata })
+        .eq("user_id", user.id)
+        .eq("id", projectId)
+        .select("*")
+        .single();
+      if (error) throw new Error(`Unable to save Shopify checklist progress: ${error.message}`);
+      return NextResponse.json({ ok: true, project: data });
     }
 
     return NextResponse.json({ ok: false, error: "Unknown Weekly Authority action." }, { status: 400 });
