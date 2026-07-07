@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
-import { BarChart3, BookOpenCheck, BookOpenText, Brain, CalendarDays, CheckSquare, Clapperboard, Compass, FolderOpen, Home, Image, LayoutTemplate, Megaphone, Plug, Settings, Sparkles, UserRound, WalletCards } from "lucide-react";
+import { BarChart3, BookOpenCheck, BookOpenText, Brain, CalendarDays, CheckSquare, Clapperboard, Compass, FolderOpen, Home, Image, LayoutTemplate, Megaphone, Newspaper, Plug, Settings, Sparkles, UserRound, WalletCards } from "lucide-react";
 import { AccountBadge } from "./AccountBadge";
 
 const navGroups = [
@@ -22,6 +22,7 @@ const navGroups = [
     items: [
       { href: "/content-generator", label: "Content Generator", icon: Sparkles },
       { href: "/content-intelligence", label: "Content Intelligence", icon: Compass },
+      { href: "/weekly-authority", label: "Weekly Authority", icon: Newspaper },
       { href: "/media-generator", label: "Creative Studio", icon: Image }
     ]
   },

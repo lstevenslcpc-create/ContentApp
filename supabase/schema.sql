@@ -325,6 +325,141 @@ create table if not exists content_calendar_focuses (
 create unique index if not exists content_calendar_focuses_user_week_idx
 on content_calendar_focuses(user_id, week_start);
 
+create table if not exists weekly_authority_projects (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  blog_topic text not null,
+  target_audience text,
+  primary_keyword text,
+  secondary_keywords text[] default '{}',
+  business_goal text,
+  cta_focus text,
+  shopify_blog_category text,
+  suggested_publish_date date,
+  status text default 'Topic Planned',
+  creative_brief jsonb default '{}'::jsonb,
+  claude_prompt text,
+  claude_draft text,
+  content_dna jsonb default '{}'::jsonb,
+  weekly_assets jsonb default '{}'::jsonb,
+  shopify_metadata jsonb default '{}'::jsonb,
+  content_pack_id uuid references content_packs(id) on delete set null,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  constraint weekly_authority_projects_status_check check (status in (
+    'Topic Planned',
+    'Brief Ready',
+    'Claude Prompt Ready',
+    'Sent to Claude',
+    'Claude Draft Needed',
+    'Draft Pasted',
+    'Content DNA Generated',
+    'Weekly Assets Generated',
+    'Needs Review',
+    'Approved',
+    'Scheduled',
+    'Published on Shopify'
+  ))
+);
+
+create table if not exists blog_creative_briefs (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  project_id uuid not null references weekly_authority_projects(id) on delete cascade,
+  brief jsonb default '{}'::jsonb,
+  shopify_metadata jsonb default '{}'::jsonb,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create table if not exists claude_blog_prompts (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  project_id uuid not null references weekly_authority_projects(id) on delete cascade,
+  prompt text not null,
+  status text default 'Claude Prompt Ready',
+  sent_to_claude_at timestamptz,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create table if not exists claude_blog_drafts (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  project_id uuid not null references weekly_authority_projects(id) on delete cascade,
+  draft text not null,
+  analysis_status text default 'Draft Pasted',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create table if not exists content_dna (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  project_id uuid not null references weekly_authority_projects(id) on delete cascade,
+  dna jsonb default '{}'::jsonb,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create table if not exists repurposed_blog_assets (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  project_id uuid not null references weekly_authority_projects(id) on delete cascade,
+  content_pack_id uuid references content_packs(id) on delete set null,
+  asset_type text not null,
+  platform text,
+  asset jsonb default '{}'::jsonb,
+  status text default 'needs_review',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create table if not exists shopify_blog_metadata (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  project_id uuid not null references weekly_authority_projects(id) on delete cascade,
+  "shopifyBlogTitle" text,
+  "shopifyExcerpt" text,
+  "shopifySeoTitle" text,
+  "shopifyMetaDescription" text,
+  "shopifyUrlHandle" text,
+  "shopifyTags" text[] default '{}',
+  "shopifyBlogUrlPlaceholder" text,
+  "shopifyProductCtaSuggestions" text[] default '{}',
+  "shopifyInternalProductLinks" text[] default '{}',
+  "shopifyPublishingChecklist" text[] default '{}',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create index if not exists weekly_authority_projects_user_status_idx
+on weekly_authority_projects(user_id, status);
+
+create index if not exists weekly_authority_projects_publish_date_idx
+on weekly_authority_projects(suggested_publish_date);
+
+create unique index if not exists blog_creative_briefs_project_idx
+on blog_creative_briefs(project_id);
+
+create unique index if not exists claude_blog_prompts_project_idx
+on claude_blog_prompts(project_id);
+
+create unique index if not exists claude_blog_drafts_project_idx
+on claude_blog_drafts(project_id);
+
+create unique index if not exists content_dna_project_idx
+on content_dna(project_id);
+
+create index if not exists repurposed_blog_assets_project_idx
+on repurposed_blog_assets(project_id);
+
+create index if not exists repurposed_blog_assets_pack_idx
+on repurposed_blog_assets(content_pack_id);
+
+create unique index if not exists shopify_blog_metadata_project_idx
+on shopify_blog_metadata(project_id);
+
 create table if not exists social_accounts (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete cascade,
@@ -564,6 +699,41 @@ create trigger content_calendar_focuses_updated_at
 before update on content_calendar_focuses
 for each row execute procedure set_updated_at();
 
+drop trigger if exists weekly_authority_projects_updated_at on weekly_authority_projects;
+create trigger weekly_authority_projects_updated_at
+before update on weekly_authority_projects
+for each row execute procedure set_updated_at();
+
+drop trigger if exists blog_creative_briefs_updated_at on blog_creative_briefs;
+create trigger blog_creative_briefs_updated_at
+before update on blog_creative_briefs
+for each row execute procedure set_updated_at();
+
+drop trigger if exists claude_blog_prompts_updated_at on claude_blog_prompts;
+create trigger claude_blog_prompts_updated_at
+before update on claude_blog_prompts
+for each row execute procedure set_updated_at();
+
+drop trigger if exists claude_blog_drafts_updated_at on claude_blog_drafts;
+create trigger claude_blog_drafts_updated_at
+before update on claude_blog_drafts
+for each row execute procedure set_updated_at();
+
+drop trigger if exists content_dna_updated_at on content_dna;
+create trigger content_dna_updated_at
+before update on content_dna
+for each row execute procedure set_updated_at();
+
+drop trigger if exists repurposed_blog_assets_updated_at on repurposed_blog_assets;
+create trigger repurposed_blog_assets_updated_at
+before update on repurposed_blog_assets
+for each row execute procedure set_updated_at();
+
+drop trigger if exists shopify_blog_metadata_updated_at on shopify_blog_metadata;
+create trigger shopify_blog_metadata_updated_at
+before update on shopify_blog_metadata
+for each row execute procedure set_updated_at();
+
 drop trigger if exists integration_connections_updated_at on integration_connections;
 create trigger integration_connections_updated_at
 before update on integration_connections
@@ -580,6 +750,13 @@ alter table content_packs enable row level security;
 alter table canva_templates enable row level security;
 alter table content_calendar_plans enable row level security;
 alter table content_calendar_focuses enable row level security;
+alter table weekly_authority_projects enable row level security;
+alter table blog_creative_briefs enable row level security;
+alter table claude_blog_prompts enable row level security;
+alter table claude_blog_drafts enable row level security;
+alter table content_dna enable row level security;
+alter table repurposed_blog_assets enable row level security;
+alter table shopify_blog_metadata enable row level security;
 alter table social_accounts enable row level security;
 alter table analytics_events enable row level security;
 alter table integration_connections enable row level security;
@@ -647,6 +824,48 @@ with check (auth.uid() = user_id);
 drop policy if exists "Users can manage their content calendar focuses" on content_calendar_focuses;
 create policy "Users can manage their content calendar focuses"
 on content_calendar_focuses for all
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+drop policy if exists "Users can manage their weekly authority projects" on weekly_authority_projects;
+create policy "Users can manage their weekly authority projects"
+on weekly_authority_projects for all
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+drop policy if exists "Users can manage their blog creative briefs" on blog_creative_briefs;
+create policy "Users can manage their blog creative briefs"
+on blog_creative_briefs for all
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+drop policy if exists "Users can manage their Claude blog prompts" on claude_blog_prompts;
+create policy "Users can manage their Claude blog prompts"
+on claude_blog_prompts for all
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+drop policy if exists "Users can manage their Claude blog drafts" on claude_blog_drafts;
+create policy "Users can manage their Claude blog drafts"
+on claude_blog_drafts for all
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+drop policy if exists "Users can manage their content DNA" on content_dna;
+create policy "Users can manage their content DNA"
+on content_dna for all
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+drop policy if exists "Users can manage their repurposed blog assets" on repurposed_blog_assets;
+create policy "Users can manage their repurposed blog assets"
+on repurposed_blog_assets for all
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+drop policy if exists "Users can manage their Shopify blog metadata" on shopify_blog_metadata;
+create policy "Users can manage their Shopify blog metadata"
+on shopify_blog_metadata for all
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
 
